@@ -23,7 +23,7 @@ class WallhavenApi {
   ///
   /// [query] - search term
   /// [categories] - '111' = General+Anime+People, '100' = General only, etc.
-  /// [purity] - '100' = SFW only, '110' = SFW+Sketchy, '111' = all
+  /// Only SFW wallpapers are returned (purity is hardcoded to '100').
   /// [sorting] - 'date_added', 'relevance', 'random', 'views', 'favorites', 'toplist'
   /// [order] - 'desc' or 'asc'
   /// [topRange] - for toplist sorting: '1d', '3d', '1w', '1M', '3M', '6M', '1y'
@@ -32,7 +32,6 @@ class WallhavenApi {
   Future<WallhavenResponse> search({
     String? query,
     String categories = '111',
-    String purity = '100',
     String sorting = 'toplist',
     String order = 'desc',
     String? topRange,
@@ -41,7 +40,7 @@ class WallhavenApi {
   }) async {
     final params = <String, String>{
       'categories': categories,
-      'purity': purity,
+      'purity': '100',  // SFW only
       'sorting': sorting,
       'order': order,
       'page': page.toString(),

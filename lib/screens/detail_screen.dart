@@ -182,8 +182,6 @@ class _DetailScreenState extends State<DetailScreen> {
           Row(
             children: [
               _badge(widget.wallpaper.category, _categoryColor(widget.wallpaper.category)),
-              const SizedBox(width: 8),
-              _badge(widget.wallpaper.purity, _purityColor(widget.wallpaper.purity)),
               const Spacer(),
               _buildDownloadButton(),
             ],
@@ -298,17 +296,6 @@ class _DetailScreenState extends State<DetailScreen> {
         return Colors.purpleAccent;
       case 'people':
         return Colors.orangeAccent;
-      default:
-        return Colors.greenAccent;
-    }
-  }
-
-  Color _purityColor(String purity) {
-    switch (purity) {
-      case 'nsfw':
-        return Colors.redAccent;
-      case 'sketchy':
-        return Colors.amberAccent;
       default:
         return Colors.greenAccent;
     }

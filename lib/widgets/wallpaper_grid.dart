@@ -104,29 +104,7 @@ class _WallpaperTile extends StatelessWidget {
                 ),
               ),
             ),
-            // Purity indicator
-            if (wallpaper.purity != 'sfw')
-              Positioned(
-                top: 6,
-                right: 6,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: wallpaper.purity == 'nsfw'
-                        ? Colors.redAccent.withValues(alpha: 0.8)
-                        : Colors.amberAccent.withValues(alpha: 0.8),
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                  child: Text(
-                    wallpaper.purity.toUpperCase(),
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 9,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-              ),
+
           ],
         ),
       ),

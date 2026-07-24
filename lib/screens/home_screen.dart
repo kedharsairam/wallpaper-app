@@ -28,7 +28,6 @@ class _HomeScreenState extends State<HomeScreen> {
 
   // Filters
   String _categories = '111';
-  String _purity = '100';
   String _sorting = 'toplist';
   final String _order = 'desc';
   String? _topRange;
@@ -68,7 +67,6 @@ class _HomeScreenState extends State<HomeScreen> {
       final response = await widget.api.search(
         query: _query,
         categories: _categories,
-        purity: _purity,
         sorting: _sorting,
         order: _order,
         topRange: _topRange,
@@ -97,7 +95,6 @@ class _HomeScreenState extends State<HomeScreen> {
       final response = await widget.api.search(
         query: _query,
         categories: _categories,
-        purity: _purity,
         sorting: _sorting,
         order: _order,
         topRange: _topRange,
@@ -128,13 +125,11 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
       builder: (ctx) => _FilterSheet(
         categories: _categories,
-        purity: _purity,
         sorting: _sorting,
         topRange: _topRange,
-        onApply: (categories, purity, sorting, topRange) {
+        onApply: (categories, sorting, topRange) {
           setState(() {
             _categories = categories;
-            _purity = purity;
             _sorting = sorting;
             _topRange = topRange;
           });
@@ -277,14 +272,12 @@ class _HomeScreenState extends State<HomeScreen> {
 
 class _FilterSheet extends StatefulWidget {
   final String categories;
-  final String purity;
   final String sorting;
   final String? topRange;
-  final void Function(String, String, String, String?) onApply;
+  final void Function(String, String, String?) onApply;
 
   const _FilterSheet({
     required this.categories,
-    required this.purity,
     required this.sorting,
     this.topRange,
     required this.onApply,
@@ -298,9 +291,6 @@ class _FilterSheetState extends State<_FilterSheet> {
   late bool _general;
   late bool _anime;
   late bool _people;
-  late bool _sfw;
-  late bool _sketchy;
-  late bool _nsfw;
   late String _sorting;
   late String? _topRange;
 
@@ -312,11 +302,6 @@ class _FilterSheetState extends State<_FilterSheet> {
     _anime = cats[1] == '1';
     _people = cats[2] == '1';
 
-    final pur = widget.purity.padRight(3, '0');
-    _sfw = pur[0] == '1';
-    _sketchy = pur[1] == '1';
-    _nsfw = pur[2] == '1';
-
     _sorting = widget.sorting;
     _topRange = widget.topRange;
   }
@@ -324,9 +309,7 @@ class _FilterSheetState extends State<_FilterSheet> {
   void _apply() {
     final cats =
         '${_general ? '1' : '0'}${_anime ? '1' : '0'}${_people ? '1' : '0'}';
-    final pur =
-        '${_sfw ? '1' : '0'}${_sketchy ? '1' : '0'}${_nsfw ? '1' : '0'}';
-    widget.onApply(cats, pur, _sorting, _topRange);
+    widget.onApply(cats, _sorting, _topRange);
     Navigator.pop(context);
   }
 
@@ -362,18 +345,6 @@ class _FilterSheetState extends State<_FilterSheet> {
               _filterChip('General', _general, (v) => setState(() => _general = v)),
               _filterChip('Anime', _anime, (v) => setState(() => _anime = v)),
               _filterChip('People', _people, (v) => setState(() => _people = v)),
-            ],
-          ),
-          const SizedBox(height: 16),
-          const Text('Purity',
-              style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
-          const SizedBox(height: 8),
-          Wrap(
-            spacing: 8,
-            children: [
-              _filterChip('SFW', _sfw, (v) => setState(() => _sfw = v)),
-              _filterChip('Sketchy', _sketchy, (v) => setState(() => _sketchy = v)),
-              _filterChip('NSFW', _nsfw, (v) => setState(() => _nsfw = v)),
             ],
           ),
           const SizedBox(height: 16),
