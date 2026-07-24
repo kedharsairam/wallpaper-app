@@ -147,7 +147,7 @@ class _HomeScreenState extends State<HomeScreen> {
         backgroundColor: const Color(0xFF1A1A1A),
         elevation: 0,
         title: Text(
-          'Wallhaven',
+          'WallKraft',
           style: TextStyle(
             fontFamily: 'GoogleFonts',
             fontWeight: FontWeight.bold,
@@ -253,7 +253,9 @@ class _HomeScreenState extends State<HomeScreen> {
       );
     }
 
-    return WallpaperGrid(
+    return RefreshIndicator(
+      onRefresh: _loadWallpapers,
+      child: WallpaperGrid(
       wallpapers: _wallpapers,
       isLoadingMore: _isLoadingMore,
       hasMore: _hasMore,
@@ -266,6 +268,7 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         );
       },
+    ),
     );
   }
 }

@@ -36,17 +36,59 @@ class WallhavenWallpaper {
             .toList() ??
         [];
 
+    // Wallhaven may return numeric fields as strings through the proxy.
+    double toDouble(dynamic v, double fallback) {
+      if (v is num) return v.toDouble();
+      if (v is String) return double.tryParse(v) ?? fallback;
+      return fallback;
+    }
+
+    // Parse dimensions from the ratio string as a fallback
+    // (e.g. "1.78" for 16:9, "0.56" for 9:16).
+    double ratioFromString(String ratio) {
+      final r = double.tryParse(ratio);
+      if (r != null && r > 0) return r;
+      return 1.78; // default 16:9
+    }
+
+    final dimX = toDouble(json['dimension_x'], 0);
+    final dimY = toDouble(json['dimension_y'], 0);
+    final ratioStr = json['ratio'] as String? ?? '';
+
+    // If API returned 0 dimensions (string cast failure or missing), use ratio
+    if (dimX <= 0 || dimY <= 0) {
+      final r = ratioFromString(ratioStr);
+      // Assume a typical width and derive height from ratio
+      final width = 1920.0;
+      final height = width / r;
+      return WallhavenWallpaper(
+        id: json['id'] as String? ?? '',
+        url: json['url'] as String? ?? '',
+        path: json['path'] as String? ?? '',
+        thumbnail: thumbs['small'] as String? ?? '',
+        thumbnailLarge: thumbs['large'] as String?,
+        dimensionX: width.toInt(),
+        dimensionY: height.toInt(),
+        ratio: ratioStr,
+        fileSize: (json['file_size'] as num?)?.toInt() ?? 0,
+        favorites: (json['favorites'] as num?)?.toInt() ?? 0,
+        category: json['category'] as String? ?? 'general',
+        purity: json['purity'] as String? ?? 'sfw',
+        tags: tagsList,
+      );
+    }
+
     return WallhavenWallpaper(
       id: json['id'] as String? ?? '',
       url: json['url'] as String? ?? '',
       path: json['path'] as String? ?? '',
       thumbnail: thumbs['small'] as String? ?? '',
       thumbnailLarge: thumbs['large'] as String?,
-      dimensionX: json['dimension_x'] as int? ?? 0,
-      dimensionY: json['dimension_y'] as int? ?? 0,
-      ratio: json['ratio'] as String? ?? '',
-      fileSize: json['file_size'] as int? ?? 0,
-      favorites: json['favorites'] as int? ?? 0,
+      dimensionX: dimX.toInt(),
+      dimensionY: dimY.toInt(),
+      ratio: ratioStr,
+      fileSize: (json['file_size'] as num?)?.toInt() ?? 0,
+      favorites: (json['favorites'] as num?)?.toInt() ?? 0,
       category: json['category'] as String? ?? 'general',
       purity: json['purity'] as String? ?? 'sfw',
       tags: tagsList,

@@ -25,7 +25,7 @@ class _DetailScreenState extends State<DetailScreen> {
   String get _filename {
     final uri = Uri.parse(widget.wallpaper.path);
     final basename = uri.pathSegments.last;
-    return basename.isNotEmpty ? basename : 'wallhaven-${widget.wallpaper.id}.jpg';
+    return basename.isNotEmpty ? basename : 'wallkraft-${widget.wallpaper.id}.jpg';
   }
 
   Future<void> _download() async {
@@ -74,10 +74,10 @@ class _DetailScreenState extends State<DetailScreen> {
       if (path != null) {
         await Share.shareXFiles(
           [XFile(path)],
-          text: 'Wallhaven wallpaper: ${widget.wallpaper.url}',
+          text: 'WallKraft wallpaper: ${widget.wallpaper.url}',
         );
       } else {
-        await Share.share('Wallhaven wallpaper: ${widget.wallpaper.url}');
+        await Share.share('WallKraft wallpaper: ${widget.wallpaper.url}');
       }
     } catch (e) {
       if (!mounted) return;
@@ -106,18 +106,7 @@ class _DetailScreenState extends State<DetailScreen> {
             fontWeight: FontWeight.w500,
           ),
         ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.share, color: Colors.white70),
-            tooltip: 'Share',
-            onPressed: () => _share(DownloadService.lastDownloadPath),
-          ),
-          IconButton(
-            icon: const Icon(Icons.open_in_new, color: Colors.white70),
-            tooltip: 'Open in browser',
-            onPressed: () => _openInBrowser(context),
-          ),
-        ],
+        actions: const [],
       ),
       body: Column(
         children: [
@@ -301,12 +290,5 @@ class _DetailScreenState extends State<DetailScreen> {
     }
   }
 
-  void _openInBrowser(BuildContext context) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('URL: ${widget.wallpaper.url}'),
-        behavior: SnackBarBehavior.floating,
-      ),
-    );
-  }
+
 }

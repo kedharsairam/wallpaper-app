@@ -1,6 +1,6 @@
 {
-    "name": "wallhaven_client",
-    "short_name": "wallhaven_client",
+    "name": "WallKraft",
+    "short_name": "WallKraft",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",
