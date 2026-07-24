@@ -10,11 +10,11 @@ void main() {
     DeviceOrientation.portraitUp,
     DeviceOrientation.portraitDown,
   ]);
-  runApp(const WallhavenApp());
+  runApp(const WallKraftApp());
 }
 
-class WallhavenApp extends StatelessWidget {
-  const WallhavenApp({super.key});
+class WallKraftApp extends StatelessWidget {
+  const WallKraftApp({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -23,7 +23,7 @@ class WallhavenApp extends StatelessWidget {
     );
 
     return MaterialApp(
-      title: 'Wallhaven',
+      title: 'WallKraft',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         brightness: Brightness.dark,
