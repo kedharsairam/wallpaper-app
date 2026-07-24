@@ -1,0 +1,6 @@
+{
+  "outputDirectory": "build/web",
+  "buildCommand": "flutter build web --release",
+  "cleanUrls": true,
+  "framework": "flutter"
+}
