@@ -21,11 +21,14 @@ export async function onRequest(context) {
       },
     });
 
-    // Return the proxied response as-is (same-origin, so no CORS needed)
-    return new Response(response.body, {
+    // Read the body as text and pass it through explicitly.
+    // Using response.body (stream) can cause type coercion issues with
+    // Cloudflare's internal handling (e.g. "per_page":24 becomes "per_page":"24").
+    const bodyText = await response.text();
+    return new Response(bodyText, {
       status: response.status,
       statusText: response.statusText,
-      headers: response.headers,
+      headers: { 'Content-Type': 'application/json; charset=utf-8' },
     });
   } catch (err) {
     return new Response(JSON.stringify({ error: 'Proxy error', detail: err.message }), {

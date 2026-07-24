@@ -111,11 +111,19 @@ class WallhavenMeta {
   });
 
   factory WallhavenMeta.fromJson(Map<String, dynamic> json) {
+    // Wallhaven returns these as integers, but the Cloudflare proxy
+    // sometimes returns them as strings. Handle both.
+    int toInt(dynamic v, int fallback) {
+      if (v is int) return v;
+      if (v is String) return int.tryParse(v) ?? fallback;
+      return fallback;
+    }
+
     return WallhavenMeta(
-      currentPage: json['current_page'] as int? ?? 1,
-      lastPage: json['last_page'] as int? ?? 1,
-      perPage: json['per_page'] as int? ?? 24,
-      total: json['total'] as int? ?? 0,
+      currentPage: toInt(json['current_page'], 1),
+      lastPage: toInt(json['last_page'], 1),
+      perPage: toInt(json['per_page'], 24),
+      total: toInt(json['total'], 0),
     );
   }
 }
