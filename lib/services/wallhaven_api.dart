@@ -1,9 +1,17 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import '../models/wallhaven_wallpaper.dart';
 
 class WallhavenApi {
-  static const String _baseUrl = 'https://wallhaven.cc/api/v1';
+  /// On web we use a relative URL through the Cloudflare Pages proxy
+  /// (avoids CORS). On native (Android/iOS) we call wallhaven directly.
+  static String get _baseUrl {
+    if (kIsWeb) {
+      return '/api/v1';
+    }
+    return 'https://wallhaven.cc/api/v1';
+  }
 
   // Free API key — get yours at https://wallhaven.cc/settings/account
   // Leave null for public access (SFW only, rate-limited)
