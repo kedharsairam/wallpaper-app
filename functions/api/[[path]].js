@@ -21,11 +21,29 @@ export async function onRequest(context) {
       },
     });
 
-    // Read the body as text and pass it through explicitly.
-    // Using response.body (stream) can cause type coercion issues with
-    // Cloudflare's internal handling (e.g. "per_page":24 becomes "per_page":"24").
-    const bodyText = await response.text();
-    return new Response(bodyText, {
+    // Read the body as text and rewrite image URLs so thumbnails and
+    // full images go through our image proxy (solves CORS for canvaskit).
+    // We parse the JSON to handle escaped chars (\/ -> /), rewrite URLs,
+    // then re-serialize.
+    const body = JSON.parse(await response.text());
+
+    // Walk all values recursively and rewrite image CDN URLs to proxy URLs
+    function rewrite(obj) {
+      if (typeof obj === 'string') {
+        return obj
+          .replace(/^https:\/\/th\.wallhaven\.cc\//, '/img/th.wallhaven.cc/')
+          .replace(/^https:\/\/w\.wallhaven\.cc\//, '/img/w.wallhaven.cc/');
+      }
+      if (obj && typeof obj === 'object') {
+        for (const key of Object.keys(obj)) {
+          obj[key] = rewrite(obj[key]);
+        }
+      }
+      return obj;
+    }
+
+    const proxied = JSON.stringify(rewrite(body));
+    return new Response(proxied, {
       status: response.status,
       statusText: response.statusText,
       headers: { 'Content-Type': 'application/json; charset=utf-8' },
