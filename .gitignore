@@ -6,3 +6,5 @@ build/
 *.lock
 .gradle/
 .DS_Store
+
+.wrangler/
