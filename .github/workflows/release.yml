@@ -8,6 +8,8 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v4
 
@@ -50,4 +52,3 @@ jobs:
             3. Allow "Install from unknown sources" if prompted
           files: |
             build/app/outputs/flutter-apk/*.apk
-          generate_release_notes: true
