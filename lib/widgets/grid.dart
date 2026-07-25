@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart';
 import '../models/wallpaper.dart';
@@ -107,6 +108,61 @@ class _MasonryTileState extends State<_MasonryTile>
     super.dispose();
   }
 
+  void _showContextMenu(BuildContext context) {
+    final w = widget.wallpaper;
+    final renderBox = context.findRenderObject() as RenderBox?;
+    final offset = renderBox?.localToGlobal(Offset.zero) ?? Offset.zero;
+    showMenu<String>(
+      context: context,
+      position: RelativeRect.fromLTRB(
+        offset.dx + 50,
+        offset.dy + 20,
+        offset.dx + 200,
+        offset.dy + 100,
+      ),
+      items: [
+        const PopupMenuItem(value: 'detail', child: Text('Open Detail')),
+        const PopupMenuItem(value: 'download', child: Text('Download')),
+        const PopupMenuItem(value: 'share', child: Text('Share')),
+        const PopupMenuItem(value: 'copy', child: Text('Copy Link')),
+      ],
+    ).then((value) {
+      if (value == null) return;
+      switch (value) {
+        case 'detail':
+          widget.onTap();
+        case 'download':
+          widget.onTap(); // Navigate to detail for download
+        case 'share':
+          _onContextShare(w);
+        case 'copy':
+          _onContextCopyLink(w);
+      }
+    });
+  }
+
+  void _onContextShare(Wallpaper w) async {
+    try {
+      await Clipboard.setData(ClipboardData(text: w.path));
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Image URL copied')),
+        );
+      }
+    } catch (_) {}
+  }
+
+  void _onContextCopyLink(Wallpaper w) async {
+    try {
+      await Clipboard.setData(ClipboardData(text: w.path));
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Link copied')),
+        );
+      }
+    } catch (_) {}
+  }
+
   @override
   Widget build(BuildContext context) {
     final w = widget.wallpaper;
@@ -119,6 +175,7 @@ class _MasonryTileState extends State<_MasonryTile>
 
     return GestureDetector(
       onTap: widget.onTap,
+      onSecondaryTap: () => _showContextMenu(context),
       onTapDown: (_) => _tapController.forward(),
       onTapUp: (_) => _tapController.reverse(),
       onTapCancel: () => _tapController.reverse(),

@@ -2,10 +2,10 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 import '../models/wallpaper.dart';
 import '../services/database.dart';
+import '../services/download_manager.dart';
 import '../services/wallpaper_setter.dart';
 import '../theme.dart';
 
@@ -27,6 +27,8 @@ class _DetailScreenState extends State<DetailScreen> {
   var _downloadProgress = 0.0;
   final TransformationController _transformController =
       TransformationController();
+  var _imageError = false;
+  var _imageLoadAttempt = 0;
 
   @override
   void didChangeDependencies() {
@@ -76,38 +78,36 @@ class _DetailScreenState extends State<DetailScreen> {
 
   Future<void> _download() async {
     if (_wallpaper == null || _isDownloading) return;
+
+    // Check if already downloaded
+    final existing = await DownloadManager.instance.getExistingPath(_wallpaper!.id);
+    if (existing != null) {
+      HapticFeedback.mediumImpact();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Already saved'),
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
+      return;
+    }
+
     setState(() {
       _isDownloading = true;
       _downloadProgress = 0.0;
     });
 
     try {
-      final dir = await getApplicationDocumentsDirectory();
-      final fileName = 'wallkraft-${_wallpaper!.id}.jpg';
-      final file = File('${dir.path}/$fileName');
-
-      final request = await HttpClient().getUrl(Uri.parse(_wallpaper!.path));
-      final response = await request.close();
-
-      if (response.statusCode != 200) {
-        throw Exception('HTTP ${response.statusCode}');
-      }
-
-      final totalBytes = response.contentLength;
-      var receivedBytes = 0;
-      final sink = file.openWrite();
-
-      await for (final chunk in response) {
-        sink.add(chunk);
-        receivedBytes += chunk.length;
-        if (totalBytes > 0 && mounted) {
-          setState(() => _downloadProgress = receivedBytes / totalBytes);
-        }
-      }
-
-      await sink.close();
-
-      await WallKraftDatabase.recordDownload(_wallpaper!.id, file.path);
+      await DownloadManager.instance.download(
+        _wallpaper!,
+        onProgress: (p) {
+          if (mounted) {
+            setState(() => _downloadProgress = p.progress);
+          }
+        },
+      );
 
       if (mounted) {
         setState(() {
@@ -192,11 +192,9 @@ class _DetailScreenState extends State<DetailScreen> {
     if (which == null || !mounted) return;
 
     try {
-      final dir = await getApplicationDocumentsDirectory();
-      final file = File('${dir.path}/wallkraft-${_wallpaper!.id}.jpg');
-      if (!await file.exists()) {
-        await _download();
-      }
+      var filePath = await DownloadManager.instance.getExistingPath(_wallpaper!.id);
+      filePath ??= await DownloadManager.instance.download(_wallpaper!);
+      final file = File(filePath);
       if (await file.exists()) {
         HapticFeedback.mediumImpact();
         final success =
@@ -222,17 +220,11 @@ class _DetailScreenState extends State<DetailScreen> {
   Future<void> _share() async {
     if (_wallpaper == null) return;
     try {
-      final dir = await getApplicationDocumentsDirectory();
-      final file = File('${dir.path}/wallkraft-${_wallpaper!.id}.jpg');
-      if (!await file.exists()) {
-        await _download();
-      }
-      if (await file.exists()) {
-        await Share.shareXFiles(
-          [XFile(file.path)],
-          text: 'Wallpaper via WallKraft',
-        );
-      }
+      final filePath = await DownloadManager.instance.download(_wallpaper!);
+      await Share.shareXFiles(
+        [XFile(filePath)],
+        text: 'Wallpaper via WallKraft',
+      );
     } catch (_) {}
   }
 
@@ -354,26 +346,35 @@ class _DetailScreenState extends State<DetailScreen> {
               transformationController: _transformController,
               minScale: 1.0,
               maxScale: 5.0,
-              child: CachedNetworkImage(
-                imageUrl: _wallpaper!.path,
-                fit: BoxFit.contain,
-                // No memCacheWidth — user came here to see full quality.
-                // 80MB global cache cap prevents runaway memory.
-                placeholder: (_, _) => const Center(
-                  child: SizedBox(
-                    width: 24,
-                    height: 24,
-                    child: CircularProgressIndicator(
-                      color: AppTheme.secondaryLabel,
-                      strokeWidth: 2,
+              child: _imageError
+                  ? _buildImageErrorRetry()
+                  : CachedNetworkImage(
+                      key: ValueKey('img-$_imageLoadAttempt'),
+                      imageUrl: _wallpaper!.path,
+                      fit: BoxFit.contain,
+                      placeholder: (_, _) => const Center(
+                        child: SizedBox(
+                          width: 24,
+                          height: 24,
+                          child: CircularProgressIndicator(
+                            color: AppTheme.secondaryLabel,
+                            strokeWidth: 2,
+                          ),
+                        ),
+                      ),
+                      errorWidget: (_, _, _) {
+                        WidgetsBinding.instance
+                            .addPostFrameCallback((_) {
+                          if (mounted && !_imageError) {
+                            setState(() => _imageError = true);
+                          }
+                        });
+                        return const Center(
+                          child: Icon(Icons.broken_image,
+                              size: 48, color: AppTheme.tertiaryLabel),
+                        );
+                      },
                     ),
-                  ),
-                ),
-                errorWidget: (_, _, _) => const Center(
-                  child: Icon(Icons.broken_image,
-                      size: 48, color: AppTheme.tertiaryLabel),
-                ),
-              ),
             ),
           ),
         ),
@@ -382,6 +383,44 @@ class _DetailScreenState extends State<DetailScreen> {
           // Metadata panel (hidden with chrome)
           if (_chromeVisible) _buildMetadata(),
         ],
+      ),
+    );
+  }
+
+  Widget _buildImageErrorRetry() {
+    return GestureDetector(
+      onTap: () {
+        setState(() {
+          _imageError = false;
+          _imageLoadAttempt++;
+        });
+      },
+      child: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.broken_image,
+                size: 48, color: AppTheme.tertiaryLabel),
+            const SizedBox(height: AppTheme.spacing12),
+            const Text(
+              'Failed to load image',
+              style: TextStyle(color: AppTheme.secondaryLabel),
+            ),
+            const SizedBox(height: AppTheme.spacing8),
+            TextButton(
+              onPressed: () {
+                setState(() {
+                  _imageError = false;
+                  _imageLoadAttempt++;
+                });
+              },
+              style: TextButton.styleFrom(
+                foregroundColor: AppTheme.systemBlue,
+              ),
+              child: const Text('Retry'),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -406,6 +445,55 @@ class _DetailScreenState extends State<DetailScreen> {
             _infoRow('Favorites', '♡ ${_formatCount(w.favorites)}'),
             const Divider(),
             _infoRow('Category', w.category),
+            if (w.tags.isNotEmpty) ...[
+              const Divider(),
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: AppTheme.spacing8),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('Tags',
+                        style: TextStyle(
+                          color: AppTheme.secondaryLabel,
+                          fontSize: 15,
+                          fontWeight: FontWeight.w600,
+                        )),
+                    const SizedBox(height: AppTheme.spacing8),
+                    Wrap(
+                      spacing: AppTheme.spacing8,
+                      runSpacing: AppTheme.spacing8,
+                      children: [
+                        ...w.tags.take(10).map((tag) {
+                          return Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 10, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: AppTheme.secondarySystemBackground,
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Text(
+                              tag.name,
+                              style: const TextStyle(
+                                fontSize: 12,
+                                color: AppTheme.secondaryLabel,
+                              ),
+                            ),
+                          );
+                        }),
+                        if (w.tags.length > 10)
+                          Text(
+                            ' +${w.tags.length - 10} more',
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: AppTheme.tertiaryLabel,
+                            ),
+                          ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
             const SizedBox(height: AppTheme.spacing12),
             if (_isDownloading)
               Padding(

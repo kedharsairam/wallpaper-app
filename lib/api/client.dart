@@ -3,26 +3,31 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../models/wallpaper.dart';
 import '../models/rate_limit.dart';
+import 'cancel_token.dart';
 import 'exception.dart';
 
-/// Wallhaven API v1 client.
+/// Wallpaper API client with rate limit tracking and request cancellation.
 ///
 /// Automatically tracks rate limit via response headers.
 /// Throws [RateLimitExceededException] when the limit is reached.
-class WallhavenApi {
+class WallpaperApi {
   static const _baseUrl = 'https://wallhaven.cc/api/v1';
   static const _timeout = Duration(seconds: 15);
 
-  const WallhavenApi();
+  const WallpaperApi();
 
   /// Search wallpapers. Returns paginated results.
-  Future<WallhavenResponse> search({
+  ///
+  /// Pass a [cancelToken] to abort the request mid-flight
+  /// (e.g., when the user types a new search query).
+  Future<WallpaperResponse> search({
     String? query,
     String categories = '111',
     String sorting = 'toplist',
     String order = 'desc',
     String? topRange,
     int page = 1,
+    CancelToken? cancelToken,
   }) async {
     _checkRateLimit();
 
@@ -40,8 +45,10 @@ class WallhavenApi {
     final uri = Uri.parse('$_baseUrl/search').replace(queryParameters: params);
 
     try {
-      final response = await http
-          .get(uri, headers: {'Accept': 'application/json'})
+      final client = http.Client();
+      final response = await client
+          .getWithCancel(uri,
+              headers: {'Accept': 'application/json'}, cancelToken: cancelToken)
           .timeout(_timeout);
 
       _parseRateLimit(response);
@@ -50,24 +57,29 @@ class WallhavenApi {
       if (response.statusCode == 200) {
         final decoded = _decodeJson(response.body);
         if (decoded is Map<String, dynamic>) {
-          return WallhavenResponse.fromJson(decoded);
+          return WallpaperResponse.fromJson(decoded);
         }
-        throw const WallhavenException('Unexpected API response format');
+        throw const WallpaperApiException('Unexpected API response format');
       }
 
       if (response.statusCode == 429) {
         throw RateLimitExceededException();
       }
 
-      throw WallhavenException('API error: ${response.statusCode}');
-    } on WallhavenException {
+      throw WallpaperApiException('API error: ${response.statusCode}');
+    } on WallpaperApiException {
       rethrow;
     } on TimeoutException {
-      throw const WallhavenException('Request timed out. Check your connection.');
+      throw const WallpaperApiException('Request timed out. Check your connection.');
     } on http.ClientException catch (e) {
-      throw WallhavenException('Network error: ${e.message}');
+      // If the cancellation closed the client, we get a ClientException.
+      // Map it to a clear CancelledException.
+      if (cancelToken?.isCancelled == true) {
+        throw const CancelledException();
+      }
+      throw WallpaperApiException('Network error: ${e.message}');
     } catch (e) {
-      throw WallhavenException('Request failed: $e');
+      throw WallpaperApiException('Request failed: $e');
     }
   }
 
@@ -93,22 +105,22 @@ class WallhavenApi {
             return Wallpaper.fromJson(data);
           }
         }
-        throw const WallhavenException('Unexpected API response format');
+        throw const WallpaperApiException('Unexpected API response format');
       }
 
       if (response.statusCode == 429) {
         throw RateLimitExceededException();
       }
 
-      throw WallhavenException('API error: ${response.statusCode}');
-    } on WallhavenException {
+      throw WallpaperApiException('API error: ${response.statusCode}');
+    } on WallpaperApiException {
       rethrow;
     } on TimeoutException {
-      throw const WallhavenException('Request timed out. Check your connection.');
+      throw const WallpaperApiException('Request timed out. Check your connection.');
     } on http.ClientException catch (e) {
-      throw WallhavenException('Network error: ${e.message}');
+      throw WallpaperApiException('Network error: ${e.message}');
     } catch (e) {
-      throw WallhavenException('Request failed: $e');
+      throw WallpaperApiException('Request failed: $e');
     }
   }
 
@@ -133,7 +145,7 @@ class WallhavenApi {
     try {
       return jsonDecode(body);
     } catch (_) {
-      throw const WallhavenException('Invalid API response');
+      throw const WallpaperApiException('Invalid API response');
     }
   }
 }

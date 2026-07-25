@@ -22,7 +22,7 @@ WallKraft is a wallpaper discovery and management app for Android (primary) and 
 
 ### 2.1 Tab Structure (Android Bottom Tab Bar)
 
-The app has three top-level tabs, standard iOS/Android pattern:
+The app has three top-level tabs:
 
 ```
 [ Browse ]  [ Favorites ]  [ Downloads ]
@@ -39,21 +39,21 @@ Tab Bar Root
 ├── Browse
 │   └── Detail (push)
 ├── Favorites
-│   ├── (empty state → "Browse" link)
+│   ├── (empty state → "Browse Wallpapers" switches to Browse tab)
 │   └── Detail (push)
 └── Downloads
-    ├── (empty state → "Browse" link)
+    ├── (empty state → "Browse Wallpapers" switches to Browse tab)
     └── Detail (push)
 
 Detail (shared across all tabs)
 ├── Set Wallpaper (action sheet: Home / Lock / Both)
 ├── Download
-├── Favorite (heart toggle)
+├── Favorite (heart toggle with bounce animation)
 └── Share
 
 Modals:
-├── Filter Sheet (from Browse search)
-└── About / Settings (from gear icon in nav)
+├── Filter Sheet (from Browse nav bar gear icon)
+└── Settings / About (from gear icon in nav)
 ```
 
 ---
@@ -66,39 +66,37 @@ Modals:
 
 | Property | Value |
 |----------|-------|
-| Title | "WallKraft" — Large Title (34pt, Regular). Collapses to inline (17pt, Bold) on scroll. |
-| Trailing icon | Gear icon (settings/about). Only icon in nav bar. |
-| Leading icon | None (root view, no back button). |
-| Large title collapse | `expandedHeight: 96`, `collapsedHeight: 56`. Spring animation. |
+| Title | "WallKraft" — inline (17pt, Bold), centered |
+| Trailing icons | Search (magnifying glass), Filters (tune), Settings (gear) |
+| Leading icon | None (root view, no back button) |
+| Search | Tapping search icon enters inline search mode. Cancel button to dismiss. |
 
-#### Search Bar
+#### Search Bar (inline mode)
 
 | Property | Value |
 |----------|-------|
-| Style | Prominent (tinted background). Fixed below nav bar, does NOT scroll with content. |
-| Background | `secondarySystemBackground` (`#2C2C2E`) |
+| Style | Inline in nav bar. `secondarySystemBackground` (`#2C2C2E`) rounded container. |
 | Placeholder | "Search wallpapers" |
-| Corner radius | 12pt |
-| Height | 40pt |
-| Icons | Leading: magnifying glass (`Icons.search`). Trailing: Clear button (appears after text entered). |
-| Cancel button | Appears when search field is focused. Text "Cancel" in `systemBlue`. Tapping it: clears text, dismisses keyboard, resets to default feed. |
+| Corner radius | 10pt |
+| Height | 36pt |
+| Prefix icon | Magnifying glass (`Icons.search`) |
+| Cancel button | Replaces trailing icons. "Cancel" in `systemBlue`. Dismisses search, clears query, returns to default feed. |
 | Behavior | **Search-as-you-type.** Debounced at 300ms. Each keystroke updates results. |
-| Scope bar | None. HIG: "Favor improving search results over including a scope bar." Filter is in the sheet. |
-| Empty/focused state | When search field is tapped but empty, show **recent searches** as suggestion chips below. |
+| Empty/focused state | When search is open but empty, show **recent searches** as suggestion chips below. |
 
 #### Search Suggestions
 
 When search field is focused and empty, show a "Recent Searches" section:
 
 ```
-Recent Searches
+Recent Searches       [Clear All]
 [mountains]  [sunset]  [minimal]  [dark]
 ```
 
-- Stored locally (max 10, oldest replaced).
+- Stored locally (max 10, oldest replaced) via `SharedPreferences`.
 - Each chip is tappable (executes that search).
-- Swipe left to delete individual entries.
-- "Clear All" button at the end.
+- Close (X) button on each chip to delete individual entry.
+- "Clear All" button in header.
 - If no recent searches, show nothing.
 
 #### Grid
@@ -108,9 +106,10 @@ Recent Searches
 | Layout | Masonry (waterfall). `maxCrossAxisExtent: 170` |
 | Spacing | 8pt between tiles, 16pt horizontal padding |
 | Aspect ratio | Native (`dimensionX / dimensionY`). No crop. |
-| Source | `thumbnail_original` (preserves ratio) |
-| Cache | `cached_network_image` with disk cache |
+| Source | `thumbnailOriginal` when available, else `thumbnail` |
+| Cache | `cached_network_image` with disk cache, 80MB global memory cap |
 | Scroll | Infinite scroll. Loads more when 400px from bottom. |
+| Tile tap animation | 100ms scale 1.0→0.95→1.0 |
 
 #### Grid Tile Overlay
 
@@ -123,44 +122,63 @@ Gradient at bottom of each tile: `Colors.black.withValues(alpha: 0)` → `Colors
 
 #### Pull-to-Refresh
 
-Standard SwiftUI-style. Spinner in `label` color. Refreshes the current query (or default feed).
+Standard pattern. Spinner in `label` color. Refreshes the current query (or default feed).
 
 #### Loading State
 
 | Element | Detail |
 |---------|--------|
 | First load | Centered `CircularProgressIndicator` (24px), `secondaryLabel` color |
-| Load more | Bottom indicator: centered spinner + "Loading more..." in Footnote below |
+| Load more | Bottom linear indicator in grid footer |
 
 #### Empty State (no results)
 
 ```
-[photo.on.rectangle.angled icon — 48pt, tertiaryLabel]
-No wallpapers found
+[photo_library_outlined icon — 48pt, tertiaryLabel]
+No wallpapers found for "query"
 Try adjusting your search or filters
 ```
 
-- Icon in `tertiaryLabel` at 48pt
 - Title in Callout (16pt), `secondaryLabel`
 - Subtitle in Footnote (13pt), `tertiaryLabel`
-- No retry button — pull-to-refresh or change search/filters
 
 #### Error State
 
 ```
-[exclamationmark.icloud icon — 48pt, tertiaryLabel]
-Couldn't load wallpapers
-[Retry] — systemBlue text button, Body (17pt)
+[cloud_off icon — 48pt, tertiaryLabel]
+[error message]
+[Retry] — systemBlue text button
 ```
 
-- Same icon style as empty state
-- No red icons or text. Apple uses muted colors for content errors.
-- Retry button is plain text, `systemBlue`, 44pt tall tap target.
+- Retry button is plain text, `systemBlue`
 
-#### Scroll-to-Top
+#### Offline Fallback
 
-- **Mobile:** Tap status bar (not available in Flutter — accepted limitation).
-- **Desktop:** `Home` key or `Ctrl+Up`. **No FAB.**
+When network fails, the app attempts to load cached results from a local JSON file (`wallkraft_cache.json`). Cached results are shown without error if available; the error state only appears if no cache exists.
+
+#### Rate Limit Banner
+
+A blue banner appears when remaining API calls ≤ 10:
+
+```
+API calls: 8 remaining
+```
+
+When rate limited:
+
+```
+Rate limit reached. Resets in 45 minutes.
+```
+
+#### Keyboard Shortcuts (Desktop)
+
+| Key | Action |
+|-----|--------|
+| `R` / `Ctrl+R` | Refresh |
+| `Ctrl+F` | Open search |
+| `Escape` | Close search |
+| `Home` / `Ctrl+Up` | Scroll to top |
+| `Ctrl+Down` | Scroll to bottom |
 
 ### 3.2 Details Screen (shared across tabs)
 
@@ -168,9 +186,9 @@ Couldn't load wallpapers
 
 | Property | Value |
 |----------|-------|
-| Back button | Standard chevron. Label: previous screen title. |
+| Back button | Standard chevron. |
 | Title | Empty. The wallpaper is the title. |
-| Trailing | Heart (favorite) icon. Filled when favorited, outline when not. |
+| Trailing | Heart (favorite) icon. Filled when favorited, outline when not. Bounce animation on toggle. |
 | Chrome visibility | Tap image → nav bar + metadata hide. Tap again → show. |
 
 #### Image Viewer
@@ -181,59 +199,37 @@ Couldn't load wallpapers
 | Max zoom | 5x |
 | Double-tap | Zoom to 2x centered on tap point. If already zoomed, return to 1x. |
 | Pinch | Open → zoom in. Close → zoom out. |
-| Pan | One-finger drag when zoomed in. Rubber-bands at edges. |
-| Desktop zoom | Trackpad pinch. Ctrl+Scroll. Space+click+drag to pan. |
-| Desktop keyboard | `Ctrl+=` / `Ctrl+-` to zoom in/out. `Ctrl+0` to reset. |
+| Pan | One-finger drag when zoomed in. |
+| Desktop zoom | Trackpad pinch. `Ctrl+=` / `Ctrl+-` to zoom in/out. `Ctrl+0` to reset. |
 
 #### Metadata Panel
 
-Shown below the image. Each row is 44pt tall.
+Shown below the image.
 
 ```
 Resolution         1920 × 1080
 File Size          2.4 MB
 Favorites          ♡ 1,234
-Category           General
+Category           anime
 ```
-
-| Element | Style |
-|---------|-------|
-| Label | Headline (17pt, Semibold), `secondaryLabel` |
-| Value | Body (17pt, Regular), `label` |
-| Separator | Inset 16pt from leading. 1pt, `separator` color. |
-| Last row | No separator. |
 
 #### Action Buttons
 
 Placed below metadata in a vertical stack. Each is a plain text button, 44pt tall.
 
 ```
-Set Wallpaper ─────────────── systemBlue, Body (17pt)
 Download Wallpaper ────────── systemBlue, Body (17pt)
+Set Wallpaper ─────────────── systemBlue, Body (17pt)
 Share ─────────────────────── systemBlue, Body (17pt)
 ```
 
-- **Set Wallpaper:** On tap, show an action sheet:
-  - Home Screen
-  - Lock Screen
-  - Both
-  - Cancel
-  Uses `android_intent_plus` or platform channel to invoke system wallpaper setter. On Windows, this button is hidden.
-
-- **Download:** Streams to disk (as current). On success: brief toast "Saved" with checkmark, auto-dismiss 2s. On failure: toast with error message.
-
-- **Share:** Standard platform share sheet via `share_plus`. Includes image file and attribution text.
-
-#### Loading State (Detail)
-
-- Full-screen centered spinner while the full-resolution image loads.
-- Metadata shows immediately if cached from the list.
-- Error: icon + "Couldn't load wallpaper" + Retry.
+- **Download:** Streams to disk via `DownloadManager` singleton (deduplicated — tapping again while in-flight reuses the same future). On success: brief toast "Saved", auto-dismiss 2s. On failure: toast with error message. Shows `LinearProgressIndicator` during download.
+- **Set Wallpaper:** On tap, show an action sheet: Home Screen / Lock Screen / Both. Uses platform channel (`WallpaperManager` in Kotlin). Downloads the image first if not already saved. On Windows, this button is hidden.
+- **Share:** Standard platform share sheet via `share_plus`. Includes image file.
 
 #### Hero Animation
 
 - Grid tile image → Detail image uses `Hero` widget with tag `wallpaper-${id}`.
-- Shared zoom + fade transition.
 
 ### 3.3 Favorites Screen
 
@@ -243,24 +239,20 @@ Share ─────────────────────── syst
 
 #### Content
 
-Same masonry grid as Browse. Data source: local storage (SQLite or SharedPreferences).
+Same masonry grid as Browse. Data source: SQLite via `WallKraftDatabase`.
 
-- Grid tiles are identical to Browse (same overlay, same tap → Detail).
+- Grid tiles are identical to Browse.
 - Tapping heart in Detail toggles favorite. Removed from favorites list automatically.
+- Refreshes when tab is switched to.
 
 #### Empty State
 
 ```
-[heart icon — 48pt, tertiaryLabel]
-No favorites yet
-Start by tapping the heart icon on a wallpaper you love
-[Browse Wallpapers] — text button, systemBlue
+[favorite_border icon — 48pt, tertiaryLabel]
+No favorites
+Favorite wallpapers to see them here
+[Browse Wallpapers] — text button, switches to Browse tab
 ```
-
-- "Browse Wallpapers" button switches to Browse tab.
-
-#### Pull-to-Refresh
-- Refreshes the list (re-checks local storage — instant, but provides visual consistency).
 
 ### 3.4 Downloads Screen
 
@@ -270,80 +262,58 @@ Start by tapping the heart icon on a wallpaper you love
 
 #### Content
 
-Grid of locally downloaded wallpapers. Data source: reads from app document directory.
+List of locally downloaded wallpapers. Data source: reads from `getApplicationDocumentsDirectory()`, filtered to `wallkraft-*.jpg`.
 
-- Same masonry grid as Browse.
-- Each tile is the actual downloaded image (not a thumbnail).
-- Overlay: resolution (matching Browse style).
-- Long-press on tile: context menu with Delete option.
+- Each item shows: thumbnail (`Image.file`), filename, file size.
+- Trash icon to delete individual files.
+- Refreshes when tab is switched to.
 
 #### Empty State
 
 ```
-[arrow.down.circle icon — 48pt, tertiaryLabel]
-No downloads yet
-Download a wallpaper from the detail view
-[Browse Wallpapers] — text button, systemBlue
+[cloud_off icon — 48pt, tertiaryLabel]
+No downloads
+Download wallpapers to see them here
+[Browse Wallpapers] — text button, switches to Browse tab
 ```
-
-#### Image Source
-- Use `Image.file()` from the download directory.
-- If the file has been deleted externally, show a placeholder and remove from the list on next refresh.
-
-#### Swipe Actions
-- Swipe left on a download in list view (if we switch to list): "Delete" in red.
-
-**Note:** For v1, use grid view only. List view is a future enhancement.
 
 ### 3.5 Filter Sheet
 
 #### Trigger
 
-- Filter icon in the search field's trailing area (appears when search field is focused).
-- Also triggered from a "Filter" text button below the search bar (alternative entry).
+- Filter icon (tune) in Browse nav bar.
 
 #### Sheet Presentation
 
 | Property | Value |
 |----------|-------|
 | Style | Modal bottom sheet |
-| Grabber | Visible (`prefersGrabberVisible: true`) |
+| Grabber | Visible (small pill at top) |
 | Corner radius | 16pt top |
 | Background | `systemBackground` (`#1C1C1E`) |
-| Dismiss | Swipe down or tap backdrop. No explicit dismiss button. |
+| Dismiss | Swipe down or tap backdrop. |
 | Apply | **Changes apply immediately** on selection (no Apply button). |
 
 #### Categories Section
 
-Standard iOS list with checkmarks:
-
 ```
 Categories
-  ☑ General
-  ☐ Anime
-  ☐ People
+[General] [Anime] [People]
 ```
 
-- Each row 44pt, Body (17pt), label color.
-- Tapping toggles checkmark. `systemBlue` checkmark on right.
-- At least one must be active. If user deselects the last one, it automatically re-selects (silently maintains minimum).
+- Chip-style toggle. Tapping selects/deselects.
+- At least one must be active. If user deselects the last one, it auto-re-selects.
+- `AnimatedContainer` with 200ms transition.
 
 #### Sort Section
 
-Same list-with-checkmark pattern:
-
 ```
 Sort by
-  ☑ Date Added
-  ☐ Relevance
-  ☐ Random
-  ☐ Most Viewed
-  ☐ Most Favorited
-  ☐ Top List
+[Dropdown: Date Added ▼]
 ```
 
-- Single select. Tapping one moves the checkmark.
-- Selection applies immediately (sheet stays open).
+- `DropdownButtonFormField` for sort selection.
+- Six options: Date Added, Relevance, Random, Most Viewed, Most Favorited, Top List.
 
 #### Top Range Section
 
@@ -351,27 +321,16 @@ Only visible when Sort is "Top List":
 
 ```
 Top Range
-  ☑ Past 24h
-  ☐ Past 3 days
-  ☐ Past week
-  ☐ Past month
-  ☐ Past 3 months
-  ☐ Past 6 months
-  ☐ Past year
+[Dropdown: Past month ▼]
 ```
 
-- Same pattern. Single select.
-- Animate section appearance/disappearance when Top List is selected/deselected.
-
-#### Sections Layout
-
-Each section has a header in Title 2 (22pt, Regular, `label`), 16pt padding top, 8pt bottom.
+- Seven options: Past 24h, Past 3 days, Past week, Past month, Past 3 months, Past 6 months, Past year.
 
 ### 3.6 Settings / About Sheet
 
 #### Trigger
 
-Gear icon in Browse nav bar trailing position.
+Gear icon in Browse nav bar.
 
 #### Presentation
 
@@ -384,20 +343,12 @@ About
   Version         1.0.0
   Build           1
   ───────────
-  Powered by Wallhaven
-  ───────────
   Privacy Policy
   Open Source Licenses
 ```
 
-- "Powered by Wallhaven" links to wallhaven.cc (opens in browser).
-- "Privacy Policy" — opens `PRIVACY.md` or a web URL.
 - Version info is auto-populated from build config.
-
-#### No traditional settings needed
-- No theme toggle (dark mode only).
-- No account management (no auth in v1).
-- No cache clearing (system manages this).
+- Privacy Policy removed for v1 (displays empty view).
 
 ---
 
@@ -405,7 +356,7 @@ About
 
 ### 4.1 WallpaperGrid
 
-Shared across Browse, Favorites, Downloads.
+Shared across Browse, Favorites.
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
@@ -414,45 +365,21 @@ Shared across Browse, Favorites, Downloads.
 | `hasMore` | `bool` | Hide bottom loader if false |
 | `scrollController` | `ScrollController?` | For infinite scroll |
 | `onTap` | `void Function(Wallpaper)` | Navigate to detail |
-| `heroPrefix` | `String` | Unique prefix for Hero tags per tab |
 
-### 4.2 GridTile
+### 4.2 FilterSheet
 
-Individual tile in the masonry grid.
+Standalone widget file (`widgets/filter_sheet.dart`) with static `show()` method.
 
-| Element | Detail |
-|---------|--------|
-| Image | `CachedNetworkImage` with `thumbnailOriginal`. Placeholder: dark `#2C2C2E` rectangle. Error: same dark rectangle. |
-| Hero tag | `heroPrefix + wallpaper.id` |
-| Aspect ratio | Intrinsic from `dimensionX/dimensionY` |
-| Overlay | Gradient bottom-to-top, 28pt. Favorites left, resolution right. |
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `categories` | `String` | 3-char code (e.g. "111") |
+| `sorting` | `String` | API sort value |
+| `topRange` | `String?` | API top range value |
+| `onApply` | `void Function(String, String, String?)` | Called on every change |
 
-### 4.3 LoadingTile
+### 4.3 EmptyState
 
-Shimmer placeholder for pre-load grid skeletons (optional — can be simple dark rectangles).
-
-### 4.4 InfoRow
-
-Reusable labeled row for detail metadata.
-
-| Parameter | Type |
-|-----------|------|
-| `label` | `String` |
-| `value` | `String` |
-
-### 4.5 ActionButton
-
-Plain text action button for detail screen.
-
-| Parameter | Type |
-|-----------|------|
-| `title` | `String` |
-| `color` | `Color` (default systemBlue) |
-| `onTap` | `VoidCallback` |
-
-### 4.6 EmptyState
-
-Reusable empty state for all screens.
+Reusable empty state.
 
 | Parameter | Type |
 |-----------|------|
@@ -461,7 +388,7 @@ Reusable empty state for all screens.
 | `subtitle` | `String?` |
 | `action` | `Widget?` (typically a text button) |
 
-### 4.7 ErrorState
+### 4.4 ErrorState
 
 Reusable error state.
 
@@ -475,26 +402,26 @@ Reusable error state.
 
 ## 5. Data Layer
 
-### 5.1 API — WallhavenClient
+### 5.1 API — WallpaperApi
 
 ```
 lib/
   api/
-    client.dart          # HTTP client, search() + wallpaper() methods
-    exception.dart       # WallhavenException with rate limit info
-    models.dart          # Wallpaper, Tag, WallhavenResponse, WallhavenMeta
+    cancel_token.dart       # CancelToken + extension for request cancellation
+    client.dart             # WallpaperApi: HTTP client, search() + wallpaper() methods
+    exception.dart          # WallpaperApiException, CancelledException, RateLimitExceededException
 ```
 
 #### Endpoints
 
 | Endpoint | Method | Params | Returns |
 |----------|--------|--------|---------|
-| `/search` | GET | `q`, `categories`, `purity`, `sorting`, `topRange`, `page` | `WallhavenResponse` |
-| `/wallpaper/{id}` | GET | — | Single `Wallpaper` |
+| `/search` | GET | `q`, `categories`, `purity`, `sorting`, `topRange`, `page` | `WallpaperResponse` |
+| `/w/{id}` | GET | — | Single `Wallpaper` |
 
 #### Purity
 
-Always `'100'` (SFW only) when no API key. HIG doesn't apply but App Store requires filtering explicit content for unauthenticated users.
+Always `'100'` (SFW only) when no API key.
 
 #### Rate Limit Headers
 
@@ -502,11 +429,18 @@ Every response includes:
 - `X-RateLimit-Remaining` — remaining requests in current window
 - `X-RateLimit-Reset` — epoch time when limit resets
 
-The client MUST:
-1. Parse these headers from every response.
-2. Store in a singleton `RateLimitState`.
-3. Before making a request, check if `remaining == 0`. If so, throw a specific `RateLimitExceededException` with the reset time.
-4. Expose remaining count to the UI.
+The client:
+1. Parses these headers from every response.
+2. Stores in a singleton `RateLimitState`.
+3. Before making a request, checks if `remaining == 0`. If so, throws `RateLimitExceededException`.
+4. Exposes remaining count to the UI.
+
+#### Request Cancellation
+
+The `search()` method accepts an optional `CancelToken`. When cancelled, the underlying `http.Client` is closed, aborting the request mid-flight. In-flight requests are cancelled on:
+- New search query (debounce fires)
+- Filter change
+- Widget disposal
 
 #### Error Handling
 
@@ -514,7 +448,7 @@ The client MUST:
 |-------------|-------|-------------|
 | 200 | — | Success |
 | 429 | Rate limit | "Rate limit reached. Resets in 45 minutes." |
-| 5xx | Server error | "Wallhaven is temporarily unavailable." |
+| 5xx | Server error | "API error: [status]" |
 | Timeout | No response | "Request timed out. Check your connection." |
 
 ### 5.2 Local Storage
@@ -523,8 +457,8 @@ The client MUST:
 |------|---------|-----------|
 | Favorites | `sqflite` | `favorites` table. Columns: `id TEXT PK`, `data TEXT` (JSON blob of Wallpaper), `saved_at INTEGER` |
 | Recent searches | `SharedPreferences` | `recent_searches` — JSON array of strings, max 10 |
-| Rate limit state | `SharedPreferences` | `rate_limit_remaining`, `rate_limit_reset` |
 | Downloads metadata | `sqflite` | `downloads` table. Columns: `id TEXT PK`, `path TEXT`, `saved_at INTEGER` |
+| Response cache | File (temp directory) | `wallkraft_cache.json` — raw JSON of last search response |
 
 #### Database Schema
 
@@ -547,8 +481,9 @@ CREATE TABLE downloads (
 ```
 lib/
   models/
-    wallpaper.dart       # Wallpaper, Tag, WallhavenResponse, WallhavenMeta, Category enum
-    rate_limit.dart      # RateLimitState
+    category.dart         # Category, SortOption, TopRange enums
+    wallpaper.dart        # Wallpaper, Tag, WallpaperResponse, WallpaperMeta
+    rate_limit.dart       # RateLimitState
 ```
 
 #### Wallpaper Model
@@ -557,20 +492,20 @@ lib/
 class Wallpaper {
   final String id;
   final String url;
-  final String thumbnail;
+  final String path;          // Full-res image URL
+  final String thumbnail;     // Small thumb
+  final String? thumbnailLarge;
   final String? thumbnailOriginal;
-  final String imageOriginal; // Full-res image URL
   final int dimensionX;
   final int dimensionY;
+  final String ratio;
   final int fileSize;
-  final String category; // 'general', 'anime', 'people'
   final int favorites;
-  final String resolution; // "1920x1080"
+  final String category;      // 'general', 'anime', 'people'
   final List<Tag> tags;
-  final DateTime createdAt;
 
-  // Computed
-  String get fileSizeFormatted; // "2.4 MB"
+  String get resolution;         // "1920x1080"
+  String get fileSizeFormatted;  // "2.4 MB"
 }
 ```
 
@@ -578,9 +513,29 @@ class Wallpaper {
 
 ```dart
 enum Category { general, anime, people }
-enum Sorting { dateAdded, relevance, random, views, favorites, toplist }
-enum TopRange { pastDay, past3Days, pastWeek, pastMonth, past3Months, past6Months, pastYear }
+enum SortOption { dateAdded, relevance, random, mostViewed, mostFavorited, topList }
+enum TopRange { past24h, past3Days, pastWeek, pastMonth, past3Months, past6Months, pastYear }
 ```
+
+### 5.4 Services
+
+```
+lib/
+  services/
+    cache_service.dart        # CacheService — file-based JSON cache for offline fallback
+    database.dart             # WallKraftDatabase — SQLite with favorites + downloads tables
+    download_manager.dart     # DownloadManager — singleton, deduplicates in-flight downloads
+    recent_searches.dart      # RecentSearchesService — SharedPreferences-backed search history
+    update_checker.dart       # UpdateChecker — fetches latest GitHub release tag
+    wallpaper_setter.dart     # WallpaperSetter — platform channel for Android WallpaperManager
+```
+
+#### DownloadManager
+
+Singleton (`DownloadManager.instance`). Deduplicates in-flight requests:
+- `download(wallpaper, onProgress?)` — returns file path. If already downloading, returns existing future.
+- `isDownloading(id)` — check if in progress.
+- `getExistingPath(id)` — check if already on disk.
 
 ---
 
@@ -590,34 +545,30 @@ enum TopRange { pastDay, past3Days, pastWeek, pastMonth, past3Months, past6Month
 
 | Concern | Implementation |
 |---------|---------------|
-| Set wallpaper | Platform channel to `WallpaperManager`. Intent with `WallpaperManager.FLAG_SET_SYSTEM`, `FLAG_SET_LOCK`, or both. |
-| Save to gallery | Android 10+ use `MediaStore` (no permission needed). Below 10 use `WRITE_EXTERNAL_STORAGE`. Offer both "App folder" and "Gallery" save locations. |
-| Back gesture | Standard Android back gesture. Works with Flutter's `PopScope`. |
-| Share sheet | `share_plus` with `Share.shareXFiles()`. |
-| App icon | Adaptive icon: geometric "W" on dark navy gradient. Already generated. |
-| Splash screen | `flutter_native_splash` already configured. `#0F0F0F` background. |
+| Set wallpaper | Platform channel to `WallpaperManager` in Kotlin `MainActivity.kt` |
+| Save to gallery | Downloads to `getApplicationDocumentsDirectory()` (app-private) |
+| Share sheet | `share_plus` with `Share.shareXFiles()` |
+| App icon | Adaptive icon |
+| Permissions | `INTERNET`, `SET_WALLPAPER` in manifest. No storage permissions (scoped storage). |
 
 ### 6.2 Windows (Desktop)
 
 | Concern | Implementation |
 |---------|---------------|
-| Window min size | 400×600. Set in `win32_window.cpp`. |
-| Keyboard shortcuts | `CallbackShortcuts` wrapping the app. `R`/`Ctrl+R` refresh, `Ctrl+F` search, `Escape` dismiss, `Home`/`Ctrl+Up` scroll to top, `Ctrl+=`/`Ctrl+-` zoom, `Ctrl+0` zoom reset. |
-| Tab bar | Replace bottom tab bar with top tab bar (TabBar at top). Or use a sidebar. Flutter's `TabBar` adapts well. |
-| Menu bar | Optional. Not critical for v1. |
-| Download location | `getApplicationDocumentsDirectory()` or user's Pictures folder. |
-| Set wallpaper | Not supported on Windows. Hide the button. |
-| Context menu | Right-click on grid tile: "Open", "Download", "Copy link". |
-| Mouse wheel | Standard vertical scroll. Ctrl+wheel for zoom in detail view. |
+| Window min size | 400×600 |
+| Keyboard shortcuts | `CallbackShortcuts` wrapping the app |
+| Download location | `getApplicationDocumentsDirectory()` |
+| Set wallpaper | Not supported. Button not shown. |
+| SQLite | Uses `sqflite_common_ffi` via `databaseFactoryFfi` in `main.dart` |
 
-### 6.3 Cross-Platform (both)
+### 6.3 Cross-Platform
 
 | Concern | Implementation |
 |---------|---------------|
-| Image cache | `cached_network_image` with `CachedNetworkImageProvider`. Default cache: 1GB disk limit, 30 days. |
-| File paths | `path_provider` `getApplicationDocumentsDirectory()` for downloads. |
-| Share | `share_plus`. |
-| Haptics | `HapticFeedback.lightImpact()` on: favorite toggle, download complete, filter applied. |
+| Image cache | `cached_network_image` with 80MB global memory cap |
+| File paths | `path_provider` `getApplicationDocumentsDirectory()` for downloads |
+| Share | `share_plus` pinned at `^10.1.4` (upstream issue fluttercommunity#3831) |
+| Haptics | `HapticFeedback.lightImpact()` on favorite toggle, download complete |
 
 ---
 
@@ -630,13 +581,14 @@ enum TopRange { pastDay, past3Days, pastWeek, pastMonth, past3Months, past6Month
 | Loading (first) | App just launched | Centered spinner |
 | Loaded | Data returned | Masonry grid |
 | Empty | No results for query | EmptyState icon + text |
-| Error | Network/API failure | ErrorState icon + text + Retry |
-| Loading more | Scrolled near bottom | Bottom spinner |
-| Error loading more | - | Snackbar "Couldn't load more" |
+| Error (with cache) | Network/API failure + cache available | Grid shows cached data (no error) |
+| Error (no cache) | Network/API failure, no cache | ErrorState icon + text + Retry |
+| Loading more | Scrolled near bottom | Bottom indicator |
+| Error loading more | - | Snackbar "Failed to load more: ..." |
 | Search focused, no text | User tapped search | Recent searches chips |
-| Search typing | User is typing | Debounced grid update |
-| Search empty results | No matches | EmptyState "No results for X" |
-| Rate limited | 429 response | Banner: "Rate limit reached. Resets at 3:45 PM." |
+| Search typing | User is typing | Debounced grid update, previous request cancelled |
+| Search empty results | No matches | EmptyState "No wallpapers found for 'query'" |
+| Rate limited | 429 response | Blue banner |
 
 ### Detail Screen
 
@@ -644,12 +596,11 @@ enum TopRange { pastDay, past3Days, pastWeek, pastMonth, past3Months, past6Month
 |-------|-----------|-----|
 | Loading | Full image loading | Centered spinner |
 | Loaded | Image ready | Image + metadata + actions |
-| Error | Image failed to load | ErrorState + Retry |
-| Downloading | In progress | Button shows "Downloading..." + progress |
+| Downloading | In progress | Button shows "Downloading X%" + progress bar |
 | Download success | - | Toast "Saved" (2s, auto-dismiss) |
 | Download error | - | Toast "Download failed: [reason]" |
-| Setting wallpaper | - | Activity indicator overlay |
-| Wallpaper set | - | Toast "Wallpaper set" |
+| Already saved | File exists | Toast "Already saved" |
+| Wallpaper set | - | Toast "Wallpaper set" / "Failed to set wallpaper" |
 | Chrome hidden | User tapped image | Nav bar + metadata hidden |
 
 ### Favorites Screen
@@ -658,29 +609,16 @@ enum TopRange { pastDay, past3Days, pastWeek, pastMonth, past3Months, past6Month
 |-------|-----------|-----|
 | Loading | DB reading | Centered spinner |
 | Loaded | Has favorites | Masonry grid |
-| Empty | No favorites | EmptyState + Browse button |
-| Error | DB error | ErrorState + Retry (re-read) |
-| Pull-to-refresh | User pulled | Standard spinner |
+| Empty | No favorites | EmptyState + "Browse Wallpapers" button |
 
 ### Downloads Screen
 
 | State | Condition | UI |
 |-------|-----------|-----|
 | Loading | Scanning directory | Centered spinner |
-| Loaded | Has downloads | Masonry grid |
-| Empty | No downloads | EmptyState + Browse button |
-| Error | Permission/storage issue | ErrorState + Retry |
-| File missing | Deleted externally | Placeholder tile with "File not found" |
-
-### Filter Sheet
-
-| State | Condition | UI |
-|-------|-----------|-----|
-| Open | User tapped filter | Sheet with 3 sections |
-| Category — none selected | Impossible state | Auto-reselect General |
-| Category — selection changed | User tapped | Checkmark moves instantly |
-| Sort — Top List | User selected | Top Range section appears with animation |
-| Sort — other | User selected | Top Range section disappears with animation |
+| Loaded | Has downloads | List with thumbnails + file info |
+| Empty | No downloads | EmptyState + "Browse Wallpapers" button |
+| Delete | User taps trash | File deleted, list refreshed |
 
 ---
 
@@ -688,31 +626,24 @@ enum TopRange { pastDay, past3Days, pastWeek, pastMonth, past3Months, past6Month
 
 | Interaction | Animation | Duration | Curve |
 |-------------|-----------|----------|-------|
-| Nav bar title collapse | Scale down + fade | 300ms | iOS spring |
-| Search bar focus | Cancel button slides in | 200ms | easeInOut |
 | Grid → Detail | Hero zoom + fade | 300ms | easeOut |
 | Detail chrome hide | Crossfade | 200ms | easeInOut |
-| Favorite toggle | Heart icon scale bounce (1→1.3→1) | 300ms | spring |
-| Download complete | Toast slides up from bottom | 300ms, stays 2s | easeOut |
+| Favorite toggle | Heart scale bounce (1→1.3→1) | 200ms | easeOut |
+| Download complete | Toast slides up | 300ms | easeOut |
 | Filter sheet | Slides up from bottom | 300ms | easeOut |
-| Category checkmark | Checkmark fade in/out | 150ms | easeInOut |
-| Sort selection | Checkmark moves | 150ms | easeInOut |
-| Pull-to-refresh | Standard spinner | - | - |
-| Error state → Retry | Button tap feedback | 100ms | - |
+| Category chip | AnimatedContainer color transition | 200ms | easeInOut |
 | Tile tap (grid) | Scale 1→0.95→1 | 100ms | easeInOut |
 
 ---
 
-## 9. Typography & Colors (Recap)
+## 9. Typography & Colors
 
 ### Typography Scale
-
-See the full table at the top of this doc. Key values:
 
 | Token | Size | Weight |
 |-------|------|--------|
 | Large Title | 34pt | Regular |
-| Title 2 | 22pt | Regular |
+| Title 3 | 20pt | Regular |
 | Headline | 17pt | Semibold |
 | Body | 17pt | Regular |
 | Callout | 16pt | Regular |
@@ -721,18 +652,17 @@ See the full table at the top of this doc. Key values:
 
 ### Color Palette (Dark Mode)
 
-| Token | Hex | Opacity |
-|-------|-----|---------|
-| `systemBackground` | `#1C1C1E` | 100% |
-| `secondarySystemBackground` | `#2C2C2E` | 100% |
-| `tertiarySystemBackground` | `#3A3A3C` | 100% |
-| `label` | `#FFFFFF` | 100% |
-| `secondaryLabel` | `#EBEBF5` | 60% |
-| `tertiaryLabel` | `#EBEBF5` | 30% |
-| `systemBlue` | `#007AFF` | 100% |
-| `separator` | `#38383A` | 100% |
-| Scaffold background | `#0F0F0F` | 100% (app-wide dark base — matches splash) |
-| Tile placeholder | `#2C2C2E` | 100% |
+| Token | Hex | Usage |
+|-------|-----|-------|
+| `background` | `#0F0F0F` | Scaffold background |
+| `systemBackground` | `#1C1C1E` | Cards, sheets |
+| `secondarySystemBackground` | `#2C2C2E` | Search field, inactive chips |
+| `tertiarySystemBackground` | `#3A3A3C` | Image error placeholder |
+| `label` | `#FFFFFF` | Primary text |
+| `secondaryLabel` | `#EBEBF5` at 60% | Secondary text |
+| `tertiaryLabel` | `#EBEBF5` at 30% | Placeholder, disabled |
+| `systemBlue` | `#007AFF` | Interactive elements |
+| `favoriteRed` | `#FF3B30` | Favorite heart |
 
 ---
 
@@ -740,145 +670,84 @@ See the full table at the top of this doc. Key values:
 
 ### Android Permissions
 
-| Permission | Required for | When requested |
-|------------|-------------|---------------|
-| `INTERNET` | API calls | Install time (auto) |
-| `SET_WALLPAPER` | Set wallpaper feature | On "Set Wallpaper" tap |
-| `WRITE_EXTERNAL_STORAGE` | Save to gallery (Android <10) | On "Download" if path is public |
-| `READ_EXTERNAL_STORAGE` | View downloads (Android <10) | On Downloads tab if path is public |
+| Permission | Required for |
+|------------|-------------|
+| `INTERNET` | API calls |
+| `SET_WALLPAPER` | Set wallpaper feature |
 
-For Android 10+, use `MediaStore` API — no storage permissions needed.
+No storage permissions needed (app-private directory with scoped storage).
 
 ### Privacy
 
-- **No analytics.** No Firebase, no Mixpanel, no telemetry.
-- **No crash reporting.** Optionally add Sentry or Crashlytics with user consent in a future version. v1 ships without.
-- **No personal data collection.** The app only stores:
-  - Favorites (local only)
-  - Recent searches (local only)
-  - Downloaded files (local only)
+- **No analytics.** No Firebase, no telemetry.
+- **No crash reporting.**
+- **No personal data collection.**
 - **Network requests:** Only to `wallhaven.cc` for API calls and image downloads.
-- **Privacy policy:** Already written (`PRIVACY.md`). Link in Settings sheet.
 
 ---
 
-## 11. Directory Structure
+## 11. Directory Structure (current)
 
 ```
-lib/
-  main.dart                     # Entry point. Creates WallhavenApi, runs WallKraftApp.
-  app.dart                      # MaterialApp with dark theme, tabs.
-  theme.dart                    # AppTheme: colors, typography, spacing constants.
-  
-  api/
-    client.dart                 # WallhavenApi: HTTP client with rate limit tracking
-    exception.dart              # WallhavenException, RateLimitExceededException
-  
-  models/
-    wallpaper.dart              # Wallpaper, Tag, WallhavenResponse, WallhavenMeta, enums
-    rate_limit.dart             # RateLimitState
-  
-  services/
-    database.dart               # SQLite database init, FavoritesDao, DownloadsDao
-    download.dart               # DownloadService: streaming file download
-    wallpaper_setter.dart       # Platform channel for setting wallpaper (Android)
-  
-  screens/
-    browse.dart                 # Browse tab — grid, search, filter
-    favorites.dart              # Favorites tab — local favorites grid
-    downloads.dart              # Downloads tab — local files grid
-    detail.dart                 # Detail — image viewer, metadata, actions
-  
-  widgets/
-    grid.dart                   # WallpaperGrid — masonry grid
-    grid_tile.dart              # GridTile — individual tile with overlay
-    search_bar.dart             # SearchBar — prominent style with suggestions
-    filter_sheet.dart           # FilterSheet — categories, sort, top range
-    info_row.dart               # InfoRow — labeled metadata row
-    action_button.dart          # ActionButton — text action button
-    empty_state.dart            # EmptyState — icon + title + optional action
-    error_state.dart            # ErrorState — icon + message + retry
-    settings_sheet.dart         # SettingsSheet — about, attribution, links
+wallkraft/
+  lib/
+    main.dart                        # Entry point. Error boundary, 80MB cache cap,
+                                     # databaseFactoryFfi init, creates WallpaperApi.
+    app.dart                         # MaterialApp, _MainScaffold with 3 tabs.
+    theme.dart                       # AppTheme: colors, typography, spacing.
 
-assets/
-  icon_source.png               # App icon source
-  feature_graphic.png           # Play Store feature graphic
+    api/
+      cancel_token.dart              # CancelToken — wraps http.Client for abort
+      client.dart                    # WallpaperApi — HTTP client with rate limits + cancellation
+      exception.dart                 # WallpaperApiException, CancelledException, RateLimitExceededException
 
-tools/
-  generate_icon.js              # Icon generation script
-  generate_feature_graphic.js   # Feature graphic generation script
+    models/
+      category.dart                  # Category, SortOption, TopRange enums
+      wallpaper.dart                 # Wallpaper, Tag, WallpaperResponse, WallpaperMeta
+      rate_limit.dart                # RateLimitState
+
+    services/
+      cache_service.dart             # CacheService — file-based JSON cache for offline
+      database.dart                  # WallKraftDatabase — SQLite favorites + downloads
+      download_manager.dart          # DownloadManager — singleton, deduplication
+      recent_searches.dart           # RecentSearchesService — max 10 via SharedPreferences
+      update_checker.dart            # UpdateChecker — GitHub API latest release
+      wallpaper_setter.dart          # Platform channel for wallpaper (Android)
+
+    screens/
+      browse.dart                    # Browse tab — search, filters, masonry grid
+      favorites.dart                 # Favorites tab — local SQLite, onBrowseTap callback
+      downloads.dart                 # Downloads tab — local files, onBrowseTap callback
+      detail.dart                    # Detail — InteractiveViewer, metadata, actions
+
+    widgets/
+      filter_sheet.dart              # FilterSheet — categories, sort, top range
+      grid.dart                      # WallpaperGrid — masonry layout
+      settings_sheet.dart            # Settings/About sheet
+      empty_state.dart               # Apple-style empty state
+      error_state.dart               # Muted error state with retry
+
+  test/
+    widget_test.dart                 # Model tests, CancelToken test, JSON round-trip
+
+  android/
+    app/src/main/kotlin/com/wallkraft/app/MainActivity.kt
+                                     # Platform channel: setWallpaper via WallpaperManager
+    app/proguard-rules.pro           # Keep model classes for JSON deserialization
 ```
 
 ---
 
-## 12. Implementation Order
-
-### Phase 1 — Foundation (Day 1)
-
-1. Create `app.dart` with TabBar (3 tabs) and dark theme.
-2. Create `theme.dart` with all system colors, typography styles, spacing constants.
-3. Create all model files (`wallpaper.dart`, `rate_limit.dart`).
-4. Create API client with rate limit tracking.
-
-### Phase 2 — Core Browsing (Day 2-3)
-
-5. Build `WallpaperGrid` + `GridTile` with masonry layout.
-6. Build Browse screen — nav bar, grid, infinite scroll, pull-to-refresh.
-7. Build loading/empty/error states.
-8. Integrate `cached_network_image`.
-
-### Phase 3 — Search & Filter (Day 3-4)
-
-9. Build `SearchBar` with prominent style, Cancel button, debounced input.
-10. Build search suggestions (recent searches).
-11. Build `FilterSheet` with checkmarks, immediate apply.
-12. Wire search + filter to API with URL params.
-
-### Phase 4 — Detail Screen (Day 4-5)
-
-13. Build image viewer with double-tap zoom, pinch zoom, pan.
-14. Build metadata panel (InfoRow widgets).
-15. Build action buttons (Set Wallpaper, Download, Share, Favorite).
-16. Add Hero animation from grid to detail.
-17. Chrome hide/show on tap.
-
-### Phase 5 — Favorites (Day 5-6)
-
-18. Set up SQLite database with favorites table.
-19. Build Favorites screen with same grid + empty state.
-20. Wire favorite toggle in Detail screen.
-
-### Phase 6 — Downloads (Day 6-7)
-
-21. Build `DownloadService` with streaming, progress, filename sanitization.
-22. Build Downloads screen with grid + empty state.
-23. Wire download button in Detail screen.
-24. Add Set Wallpaper platform channel.
-
-### Phase 7 — Polish (Day 7-8)
-
-25. Add haptics to all interactions.
-26. Add keyboard shortcuts for desktop.
-27. Build Settings/About sheet.
-28. Add rate limit banner/indicator.
-29. Test all states (loading, empty, error, rate limited).
-30. Full `flutter analyze` pass. Fix all warnings.
-31. `flutter build apk --release` — verify 50MB or less.
-
----
-
-## 13. Edge Cases & Gotchas
+## 12. Edge Cases & Gotchas
 
 | Scenario | Handling |
 |----------|----------|
-| No internet on launch | Error state with Retry. No crash. |
-| Rotate device | Grid reflows. Detail re-scales image. Sheet dismisses. |
-| Back button during search | Dismiss keyboard first, then search. |
-| Rapid filter taps | Debounce API calls. Guard with `_hasPendingSearch`. |
-| Multiple tabs downloading | Queue downloads. Max 2 concurrent. |
-| Storage full during download | Catch exception, show "Storage full" toast, delete partial file. |
-| Very long wallpaper titles | Not applicable (no titles). But very long tags in filter? Not in v1. |
-| 0x0 wallpaper dimensions | Use 16:9 fallback aspect ratio. |
-| Wallhaven API down | Error state with clear message. |
-| App in background during download | Download continues (Flutter isolates). Show notification? Not in v1. |
-| First launch vs returning user | Check `SharedPreferences` `hasLaunched` flag. Show subtle tip on first launch. |
+| No internet on launch | Error state with fallback to cached results if available |
+| Multiple rapid searches | Previous request cancelled via CancelToken before new search |
+| Double-tap download | DownloadManager deduplicates — returns existing future |
+| Set wallpaper without downloading | DownloadManager auto-downloads first, returns path |
+| Concurrent downloads | DownloadManager maps by wallpaper ID, one future per ID |
+| Share without downloading | Same auto-download pattern |
+| share_plus compile failure | Pinned at `^10.1.4` — upstream issue fluttercommunity#3831 |
+| 0x0 wallpaper dimensions | Fallback to 16:9 aspect ratio |
+| Database migration | Version check in `WallKraftDatabase._initDatabase()` |

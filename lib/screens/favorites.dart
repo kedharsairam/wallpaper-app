@@ -5,7 +5,9 @@ import '../theme.dart';
 import '../widgets/grid.dart';
 
 class FavoritesScreen extends StatefulWidget {
-  const FavoritesScreen({super.key});
+  final VoidCallback? onBrowseTap;
+
+  const FavoritesScreen({super.key, this.onBrowseTap});
 
   @override
   FavoritesScreenState createState() => FavoritesScreenState();
@@ -85,7 +87,7 @@ class FavoritesScreenState extends State<FavoritesScreen> {
             ),
             const SizedBox(height: AppTheme.spacing16),
             TextButton(
-              onPressed: () {},
+              onPressed: widget.onBrowseTap,
               child: const Text('Browse Wallpapers'),
             ),
           ],

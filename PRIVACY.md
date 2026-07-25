@@ -19,9 +19,9 @@ WallKraft collects no personal data. The app does not:
 
 ## Third-Party Services
 
-WallKraft displays wallpapers fetched from the **Wallhaven API** (wallhaven.cc). When you search or browse, your search query and IP address are sent to Wallhaven's servers as part of the standard HTTP request. Wallhaven's own privacy policy applies to those interactions.
+WallKraft fetches wallpapers from a third-party API. When you search or browse, your search query and IP address are sent to the API servers as part of the standard network request. The third-party service's own privacy policy applies to those interactions.
 
-WallKraft does not control what data Wallhaven collects.
+WallKraft does not control what data the third-party service collects.
 
 ## Local Storage
 
@@ -29,7 +29,7 @@ Wallpapers you choose to download are saved to your device's local storage. Thes
 
 ## Permissions
 
-WallKraft requests the **Internet** permission to fetch wallpapers from the Wallhaven API. No other permissions are required or requested.
+WallKraft requests the **Internet** permission to fetch wallpapers. No other permissions are required or requested.
 
 ## Children's Privacy
 

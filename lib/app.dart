@@ -9,7 +9,7 @@ import 'services/update_checker.dart';
 import 'theme.dart';
 
 class WallKraftApp extends StatelessWidget {
-  final WallhavenApi api;
+  final WallpaperApi api;
   final UpdateChecker updater;
 
   const WallKraftApp({super.key, required this.api, required this.updater});
@@ -20,7 +20,7 @@ class WallKraftApp extends StatelessWidget {
       title: 'WallKraft',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.darkTheme,
-      home: _MainScaffold(updater: updater),
+      home: _MainScaffold(api: api, updater: updater),
       routes: {
         '/detail': (context) => const DetailScreen(),
       },
@@ -29,9 +29,10 @@ class WallKraftApp extends StatelessWidget {
 }
 
 class _MainScaffold extends StatefulWidget {
+  final WallpaperApi api;
   final UpdateChecker updater;
 
-  const _MainScaffold({required this.updater});
+  const _MainScaffold({required this.api, required this.updater});
 
   @override
   State<_MainScaffold> createState() => _MainScaffoldState();
@@ -71,19 +72,20 @@ class _MainScaffoldState extends State<_MainScaffold> {
     }
   }
 
+  void _switchToBrowse() {
+    setState(() => _currentTab = 0);
+  }
+
   @override
   Widget build(BuildContext context) {
-    // Access the API from the inherited MaterialApp's route
-    final api = WallhavenApi();
-
     return Scaffold(
       backgroundColor: AppTheme.background,
       body: IndexedStack(
         index: _currentTab,
         children: [
-          BrowseScreen(api: api),
-          FavoritesScreen(key: _favKey),
-          DownloadsScreen(key: _dlKey),
+          BrowseScreen(api: widget.api),
+          FavoritesScreen(key: _favKey, onBrowseTap: _switchToBrowse),
+          DownloadsScreen(key: _dlKey, onBrowseTap: _switchToBrowse),
         ],
       ),
       bottomNavigationBar: BottomNavigationBar(

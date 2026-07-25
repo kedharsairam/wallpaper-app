@@ -41,10 +41,10 @@ void main() {
     DeviceOrientation.portraitDown,
   ]);
 
-  // Wallhaven API works without a key (rate limit: ~45 req/hr).
+  // Works without an API key (rate limit: ~45 req/hr).
   // To use an API key, set via --dart-define=WALLHAVEN_KEY=your-key
   // at build time and pass it to the client constructor.
-  final api = WallhavenApi();
+  final api = WallpaperApi();
   final updater = UpdateChecker(currentVersion: '1.0.0');
 
   runApp(WallKraftApp(api: api, updater: updater));

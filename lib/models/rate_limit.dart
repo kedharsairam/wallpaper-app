@@ -1,6 +1,6 @@
-/// Tracks Wallhaven API rate limit state.
+/// Tracks API rate limit state.
 ///
-/// Wallhaven allows ~45 requests/hour without an API key.
+/// ~45 requests/hour without an API key.
 /// This singleton tracks remaining requests and reset time
 /// so the UI can warn the user before they hit the limit.
 class RateLimitState {

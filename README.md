@@ -1,17 +1,25 @@
-# wallhaven_client
+# WallKraft
 
-A new Flutter project.
+Browse, download, and favorite high-resolution wallpapers.
 
-## Getting Started
+## Download
 
-This project is a starting point for a Flutter application.
+Download the latest APK from the [Releases](https://github.com/kedharsairam/wallpaper-app/releases) page.
 
-A few resources to get you started if this is your first Flutter project:
+Choose the right APK for your device:
+- **arm64-v8a** — most modern phones (recommended)
+- **armeabi-v7a** — older 32-bit devices
+- **x86_64** — emulators and Chromebooks
 
-- [Learn Flutter](https://docs.flutter.dev/get-started/learn-flutter)
-- [Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Flutter learning resources](https://docs.flutter.dev/reference/learning-resources)
+## Build from Source
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+```bash
+flutter pub get
+flutter build apk --release --split-per-abi
+```
+
+## Tech Stack
+
+- Flutter 3.x
+- SQLite (sqflite)
+- No analytics, no telemetry, no personal data collection

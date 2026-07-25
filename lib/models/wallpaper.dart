@@ -123,13 +123,13 @@ class Tag {
   }
 }
 
-class WallhavenResponse {
+class WallpaperResponse {
   final List<Wallpaper> data;
-  final WallhavenMeta meta;
+  final WallpaperMeta meta;
 
-  WallhavenResponse({required this.data, required this.meta});
+  WallpaperResponse({required this.data, required this.meta});
 
-  factory WallhavenResponse.fromJson(Map<String, dynamic> json) {
+  factory WallpaperResponse.fromJson(Map<String, dynamic> json) {
     final rawData = json['data'];
     final dataList = rawData is List
         ? rawData
@@ -140,28 +140,28 @@ class WallhavenResponse {
 
     final rawMeta = json['meta'];
     final metaJson = rawMeta is Map<String, dynamic> ? rawMeta : <String, dynamic>{};
-    return WallhavenResponse(
+    return WallpaperResponse(
       data: dataList,
-      meta: WallhavenMeta.fromJson(metaJson),
+      meta: WallpaperMeta.fromJson(metaJson),
     );
   }
 }
 
-class WallhavenMeta {
+class WallpaperMeta {
   final int currentPage;
   final int lastPage;
   final int perPage;
   final int total;
 
-  WallhavenMeta({
+  WallpaperMeta({
     required this.currentPage,
     required this.lastPage,
     required this.perPage,
     required this.total,
   });
 
-  factory WallhavenMeta.fromJson(Map<String, dynamic> json) {
-    return WallhavenMeta(
+  factory WallpaperMeta.fromJson(Map<String, dynamic> json) {
+    return WallpaperMeta(
       currentPage: _int(json['current_page'], 1),
       lastPage: _int(json['last_page'], 1),
       perPage: _int(json['per_page'], 24),

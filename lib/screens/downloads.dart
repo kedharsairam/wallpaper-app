@@ -6,7 +6,9 @@ import 'package:path_provider/path_provider.dart';
 import '../theme.dart';
 
 class DownloadsScreen extends StatefulWidget {
-  const DownloadsScreen({super.key});
+  final VoidCallback? onBrowseTap;
+
+  const DownloadsScreen({super.key, this.onBrowseTap});
 
   @override
   DownloadsScreenState createState() => DownloadsScreenState();
@@ -115,7 +117,7 @@ class DownloadsScreenState extends State<DownloadsScreen> {
             ),
             const SizedBox(height: AppTheme.spacing16),
             TextButton(
-              onPressed: () {},
+              onPressed: widget.onBrowseTap,
               child: const Text('Browse Wallpapers'),
             ),
           ],
@@ -134,7 +136,17 @@ class DownloadsScreenState extends State<DownloadsScreen> {
           final entity = _files[index];
           final name = p.basename(entity.path);
           final stat = entity.statSync();
-          return ListTile(
+          return Dismissible(
+            key: ValueKey(entity.path),
+            direction: DismissDirection.endToStart,
+            background: Container(
+              alignment: Alignment.centerRight,
+              padding: const EdgeInsets.only(right: AppTheme.spacing20),
+              color: Colors.redAccent,
+              child: const Icon(Icons.delete_outline, color: Colors.white),
+            ),
+            onDismissed: (_) => _deleteFile(entity),
+            child: ListTile(
             leading: ClipRRect(
               borderRadius: BorderRadius.circular(6),
               child: Image.file(
@@ -166,6 +178,7 @@ class DownloadsScreenState extends State<DownloadsScreen> {
               tooltip: 'Delete',
               onPressed: () => _deleteFile(entity),
             ),
+          ),
           );
         },
       ),
