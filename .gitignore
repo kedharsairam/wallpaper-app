@@ -6,6 +6,8 @@ build/
 *.lock
 .gradle/
 .DS_Store
+.flutter-plugins
+.flutter-plugins-dependencies
 
 # Android signing
 android/key.properties

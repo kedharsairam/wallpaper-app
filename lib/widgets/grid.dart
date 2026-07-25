@@ -1,7 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart';
 import '../models/wallpaper.dart';
+import '../theme.dart';
+import '../helpers/responsive.dart';
 
+/// Masonry wallpaper grid shared across Browse, Favorites, and Downloads.
+///
+/// Every image is decoded at display size via [memCacheWidth] to prevent
+/// OOM crashes on mid-range devices. Each tile is wrapped in
+/// [RepaintBoundary] for scroll performance.
 class WallpaperGrid extends StatelessWidget {
   final List<Wallpaper> wallpapers;
   final bool isLoadingMore;
@@ -22,114 +30,173 @@ class WallpaperGrid extends StatelessWidget {
   Widget build(BuildContext context) {
     final itemCount = wallpapers.length + (isLoadingMore ? 1 : 0);
 
-    return GridView.builder(
+    return MasonryGridView.extent(
       controller: scrollController,
-      padding: const EdgeInsets.all(8),
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 2,
-        crossAxisSpacing: 8,
-        mainAxisSpacing: 8,
-        childAspectRatio: 0.7,
-      ),
+      padding: const EdgeInsets.all(AppTheme.spacing8),
+      maxCrossAxisExtent: 190,
+      crossAxisSpacing: AppTheme.spacing8,
+      mainAxisSpacing: AppTheme.spacing8,
       itemCount: itemCount,
       itemBuilder: (context, index) {
         if (index >= wallpapers.length) {
-          return const Center(
-            child: Padding(
-              padding: EdgeInsets.all(16),
-              child: CircularProgressIndicator(color: Colors.blueAccent),
-            ),
-          );
+          return const _LoadMoreIndicator();
         }
-
-        final wallpaper = wallpapers[index];
-        return _GridItem(wallpaper: wallpaper, onTap: () => onTap(wallpaper));
+        return RepaintBoundary(
+          child: _MasonryTile(
+            wallpaper: wallpapers[index],
+            onTap: () => onTap(wallpapers[index]),
+          ),
+        );
       },
     );
   }
 }
 
-class _GridItem extends StatelessWidget {
-  final Wallpaper wallpaper;
-  final VoidCallback onTap;
-
-  const _GridItem({required this.wallpaper, required this.onTap});
+class _LoadMoreIndicator extends StatelessWidget {
+  const _LoadMoreIndicator();
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(12),
-        child: Stack(
-          fit: StackFit.expand,
-          children: [
-            CachedNetworkImage(
-              imageUrl: wallpaper.thumbnail,
-              fit: BoxFit.cover,
-              placeholder: (context, url) => Container(
-                color: const Color(0xFF1A1A1A),
-                child: const Center(
-                  child: CircularProgressIndicator(
-                    color: Colors.blueAccent,
-                    strokeWidth: 2,
-                  ),
-                ),
-              ),
-              errorWidget: (context, url, error) => Container(
-                color: const Color(0xFF1A1A1A),
-                child: const Icon(Icons.broken_image, color: Colors.white24),
-              ),
-            ),
-            Positioned(
-              bottom: 0,
-              left: 0,
-              right: 0,
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.bottomCenter,
-                    end: Alignment.topCenter,
-                    colors: [
-                      Colors.black.withValues(alpha: 0.8),
-                      Colors.transparent,
-                    ],
-                  ),
-                ),
-                child: FittedBox(
-                  fit: BoxFit.scaleDown,
-                  alignment: Alignment.centerLeft,
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(Icons.favorite, size: 12, color: Colors.white.withValues(alpha: 0.8)),
-                      const SizedBox(width: 4),
-                      Text(
-                        _formatCount(wallpaper.favorites),
-                        style: TextStyle(
-                          color: Colors.white.withValues(alpha: 0.8),
-                          fontSize: 11,
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Icon(Icons.photo_size_select_small, size: 12, color: Colors.white.withValues(alpha: 0.8)),
-                      const SizedBox(width: 4),
-                      Text(
-                        '${wallpaper.dimensionX}x${wallpaper.dimensionY}',
-                        style: TextStyle(
-                          color: Colors.white.withValues(alpha: 0.8),
-                          fontSize: 11,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ],
+    return const Padding(
+      padding: EdgeInsets.all(AppTheme.spacing16),
+      child: Center(
+        child: SizedBox(
+          width: 20,
+          height: 20,
+          child: CircularProgressIndicator(
+            color: AppTheme.secondaryLabel,
+            strokeWidth: 2,
+          ),
         ),
       ),
+    );
+  }
+}
+
+class _MasonryTile extends StatefulWidget {
+  final Wallpaper wallpaper;
+  final VoidCallback onTap;
+
+  const _MasonryTile({required this.wallpaper, required this.onTap});
+
+  @override
+  State<_MasonryTile> createState() => _MasonryTileState();
+}
+
+class _MasonryTileState extends State<_MasonryTile>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _tapController;
+  late Animation<double> _tapAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _tapController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 100),
+      reverseDuration: const Duration(milliseconds: 100),
+    );
+    _tapAnimation = Tween<double>(begin: 1.0, end: 0.95).animate(
+      CurvedAnimation(parent: _tapController, curve: Curves.easeInOut),
+    );
+  }
+
+  @override
+  void dispose() {
+    _tapController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final w = widget.wallpaper;
+    final aspectRatio =
+        (w.dimensionX > 0 && w.dimensionY > 0)
+            ? w.dimensionX / w.dimensionY
+            : 1.0;
+
+    final tileWidth = Responsive.gridTileWidth(context);
+
+    return GestureDetector(
+      onTap: widget.onTap,
+      onTapDown: (_) => _tapController.forward(),
+      onTapUp: (_) => _tapController.reverse(),
+      onTapCancel: () => _tapController.reverse(),
+      child: AnimatedBuilder(
+        animation: _tapAnimation,
+        builder: (context, child) => Transform.scale(
+          scale: _tapAnimation.value,
+          child: child,
+        ),
+        child: Semantics(
+        label: 'Wallpaper ${w.resolution}',
+        child: Hero(
+          tag: 'wallpaper-${w.id}',
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(12),
+            child: AspectRatio(
+              aspectRatio: aspectRatio,
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  CachedNetworkImage(
+                    imageUrl:
+                        w.thumbnailOriginal ?? w.thumbnail,
+                    fit: BoxFit.cover,
+                    memCacheWidth: tileWidth,
+                    placeholder: (_, _) => const _TilePlaceholder(),
+                    errorWidget: (_, _, _) => const _TilePlaceholder(),
+                  ),
+                  Positioned(
+                    bottom: 0,
+                    left: 0,
+                    right: 0,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: AppTheme.spacing8,
+                        vertical: 6,
+                      ),
+                      decoration: const BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.bottomCenter,
+                          end: Alignment.topCenter,
+                          colors: [
+                            Color(0xCC000000),
+                            Colors.transparent,
+                          ],
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.favorite,
+                              size: 12, color: Color(0xCCFFFFFF)),
+                          const SizedBox(width: 4),
+                          Text(
+                            _formatCount(w.favorites),
+                            style: const TextStyle(
+                              color: Color(0xCCFFFFFF),
+                              fontSize: 11,
+                            ),
+                          ),
+                          const Spacer(),
+                          Text(
+                            w.resolution,
+                            style: const TextStyle(
+                              color: Color(0xCCFFFFFF),
+                              fontSize: 11,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    ),
     );
   }
 
@@ -138,5 +205,14 @@ class _GridItem extends StatelessWidget {
       return '${(count / 1000).toStringAsFixed(1)}k';
     }
     return count.toString();
+  }
+}
+
+class _TilePlaceholder extends StatelessWidget {
+  const _TilePlaceholder();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(color: AppTheme.tilePlaceholder);
   }
 }

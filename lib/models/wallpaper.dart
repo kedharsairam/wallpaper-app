@@ -4,6 +4,7 @@ class Wallpaper {
   final String path;
   final String thumbnail;
   final String? thumbnailLarge;
+  final String? thumbnailOriginal;
   final int dimensionX;
   final int dimensionY;
   final String ratio;
@@ -18,6 +19,7 @@ class Wallpaper {
     required this.path,
     required this.thumbnail,
     this.thumbnailLarge,
+    this.thumbnailOriginal,
     required this.dimensionX,
     required this.dimensionY,
     required this.ratio,
@@ -43,6 +45,7 @@ class Wallpaper {
       path: _string(json['path']),
       thumbnail: _string(thumbs['small']),
       thumbnailLarge: _nullableString(thumbs['large']),
+      thumbnailOriginal: _nullableString(thumbs['original']),
       dimensionX: _dim(json['dimension_x'], 1920),
       dimensionY: _dim(json['dimension_y'], 1080),
       ratio: _string(json['ratio'], '16:9'),

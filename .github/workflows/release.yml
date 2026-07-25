@@ -1,0 +1,53 @@
+name: Build & Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: '3.x'
+
+      - name: Get dependencies
+        run: flutter pub get
+
+      - name: Analyze
+        run: flutter analyze
+
+      - name: Build APK
+        run: flutter build apk --release --split-per-abi
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: WallKraft ${{ github.ref_name }}
+          body: |
+            ## WallKraft ${{ github.ref_name }}
+
+            Download the APK for your device architecture:
+            - **arm64-v8a** (most modern phones) — `app-arm64-v8a-release.apk`
+            - **armeabi-v7a** (older 32-bit devices) — `app-armeabi-v7a-release.apk`
+            - **x86_64** (emulators / Chromebooks) — `app-x86_64-release.apk`
+
+            ### Install
+            1. Download the APK for your device
+            2. Open the file on your Android device
+            3. Allow "Install from unknown sources" if prompted
+          files: |
+            build/app/outputs/flutter-apk/*.apk
+          generate_release_notes: true
