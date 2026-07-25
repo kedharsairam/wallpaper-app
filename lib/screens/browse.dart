@@ -36,11 +36,14 @@ class _BrowseScreenState extends State<BrowseScreen> {
     super.initState();
     _load();
     _scrollController.addListener(_onScroll);
+    _searchController.addListener(_onSearchTextChanged);
   }
 
   @override
   void dispose() {
+    _scrollController.removeListener(_onScroll);
     _scrollController.dispose();
+    _searchController.removeListener(_onSearchTextChanged);
     _searchController.dispose();
     _searchFocus.dispose();
     super.dispose();
@@ -51,6 +54,10 @@ class _BrowseScreenState extends State<BrowseScreen> {
         _scrollController.position.maxScrollExtent - 400) {
       _loadMore();
     }
+  }
+
+  void _onSearchTextChanged() {
+    setState(() {}); // Rebuild to show/hide clear button
   }
 
   Future<void> _load() async {
@@ -69,6 +76,7 @@ class _BrowseScreenState extends State<BrowseScreen> {
         topRange: _topRange,
         page: 1,
       );
+      if (!mounted) return;
       setState(() {
         _wallpapers = response.data;
         _lastPage = response.meta.lastPage;
@@ -76,6 +84,7 @@ class _BrowseScreenState extends State<BrowseScreen> {
         _isLoading = false;
       });
     } catch (e) {
+      if (!mounted) return;
       setState(() {
         _error = e.toString();
         _isLoading = false;
@@ -84,7 +93,8 @@ class _BrowseScreenState extends State<BrowseScreen> {
   }
 
   Future<void> _loadMore() async {
-    if (_isLoadingMore || !_hasMore) return;
+    // Don't load more while initial load is in progress or more is loading
+    if (_isLoading || _isLoadingMore || !_hasMore) return;
     setState(() => _isLoadingMore = true);
 
     final next = _page + 1;
@@ -96,14 +106,26 @@ class _BrowseScreenState extends State<BrowseScreen> {
         topRange: _topRange,
         page: next,
       );
+      if (!mounted) return;
       setState(() {
         _wallpapers.addAll(response.data);
         _page = next;
+        _lastPage = response.meta.lastPage;
         _hasMore = _page < _lastPage;
         _isLoadingMore = false;
       });
     } catch (e) {
+      if (!mounted) return;
       setState(() => _isLoadingMore = false);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to load more: ${e.toString()}'),
+            backgroundColor: Colors.redAccent,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
     }
   }
 
@@ -306,7 +328,7 @@ class _FilterSheetState extends State<_FilterSheet> {
     final cats =
         '${_general ? '1' : '0'}${_anime ? '1' : '0'}${_people ? '1' : '0'}';
     widget.onApply(cats, _sorting, _topRange);
-    Navigator.pop(context);
+    if (mounted) Navigator.pop(context);
   }
 
   @override
@@ -367,7 +389,9 @@ class _FilterSheetState extends State<_FilterSheet> {
               DropdownMenuItem(value: 'favorites', child: Text('Most Favorited')),
               DropdownMenuItem(value: 'toplist', child: Text('Top List')),
             ],
-            onChanged: (v) => setState(() => _sorting = v!),
+            onChanged: (v) {
+              if (v != null) setState(() => _sorting = v);
+            },
           ),
           if (_sorting == 'toplist') ...[
             const SizedBox(height: 12),

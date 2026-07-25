@@ -28,31 +28,27 @@ class Wallpaper {
   });
 
   factory Wallpaper.fromJson(Map<String, dynamic> json) {
-    final thumbs = json['thumbs'] as Map<String, dynamic>? ?? {};
-
-    final tagsList = (json['tags'] as List<dynamic>?)
-            ?.map((e) => Tag.fromJson(e as Map<String, dynamic>))
-            .toList() ??
-        [];
-
-    int dim(dynamic v, int fallback) {
-      if (v is int) return v;
-      if (v is String) return int.tryParse(v) ?? fallback;
-      return fallback;
-    }
+    final thumbs = _mapOrEmpty(json['thumbs']);
+    final rawTags = json['tags'];
+    final tagsList = rawTags is List
+        ? rawTags
+            .whereType<Map<String, dynamic>>()
+            .map((e) => Tag.fromJson(e))
+            .toList()
+        : <Tag>[];
 
     return Wallpaper(
-      id: json['id'] as String? ?? '',
-      url: json['url'] as String? ?? '',
-      path: json['path'] as String? ?? '',
-      thumbnail: thumbs['small'] as String? ?? '',
-      thumbnailLarge: thumbs['large'] as String?,
-      dimensionX: dim(json['dimension_x'], 1920),
-      dimensionY: dim(json['dimension_y'], 1080),
-      ratio: json['ratio'] as String? ?? '16:9',
-      fileSize: (json['file_size'] as num?)?.toInt() ?? 0,
-      favorites: (json['favorites'] as num?)?.toInt() ?? 0,
-      category: json['category'] as String? ?? 'general',
+      id: _string(json['id']),
+      url: _string(json['url']),
+      path: _string(json['path']),
+      thumbnail: _string(thumbs['small']),
+      thumbnailLarge: _nullableString(thumbs['large']),
+      dimensionX: _dim(json['dimension_x'], 1920),
+      dimensionY: _dim(json['dimension_y'], 1080),
+      ratio: _string(json['ratio'], '16:9'),
+      fileSize: _int(json['file_size']),
+      favorites: _int(json['favorites']),
+      category: _string(json['category'], 'general'),
       tags: tagsList,
     );
   }
@@ -65,6 +61,36 @@ class Wallpaper {
     }
     return '${(fileSize / (1024 * 1024)).toStringAsFixed(1)} MB';
   }
+
+  static String _string(dynamic v, [String fallback = '']) {
+    if (v is String) return v;
+    if (v is int || v is double) return v.toString();
+    return fallback;
+  }
+
+  static String? _nullableString(dynamic v) {
+    if (v is String) return v;
+    return null;
+  }
+
+  static int _int(dynamic v) {
+    if (v is int) return v;
+    if (v is double) return v.toInt();
+    if (v is String) return int.tryParse(v) ?? 0;
+    return 0;
+  }
+
+  static int _dim(dynamic v, int fallback) {
+    if (v is int) return v;
+    if (v is String) return int.tryParse(v) ?? fallback;
+    if (v is double) return v.toInt();
+    return fallback;
+  }
+
+  static Map<String, dynamic> _mapOrEmpty(dynamic v) {
+    if (v is Map<String, dynamic>) return v;
+    return {};
+  }
 }
 
 class Tag {
@@ -75,9 +101,22 @@ class Tag {
 
   factory Tag.fromJson(Map<String, dynamic> json) {
     return Tag(
-      id: json['id'] as int? ?? 0,
-      name: json['name'] as String? ?? '',
+      id: _int(json['id']),
+      name: _string(json['name']),
     );
+  }
+
+  static int _int(dynamic v) {
+    if (v is int) return v;
+    if (v is double) return v.toInt();
+    if (v is String) return int.tryParse(v) ?? 0;
+    return 0;
+  }
+
+  static String _string(dynamic v, [String fallback = '']) {
+    if (v is String) return v;
+    if (v is int || v is double) return v.toString();
+    return fallback;
   }
 }
 
@@ -88,12 +127,16 @@ class WallhavenResponse {
   WallhavenResponse({required this.data, required this.meta});
 
   factory WallhavenResponse.fromJson(Map<String, dynamic> json) {
-    final dataList = (json['data'] as List<dynamic>?)
-            ?.map((e) => Wallpaper.fromJson(e as Map<String, dynamic>))
-            .toList() ??
-        [];
+    final rawData = json['data'];
+    final dataList = rawData is List
+        ? rawData
+            .whereType<Map<String, dynamic>>()
+            .map((e) => Wallpaper.fromJson(e))
+            .toList()
+        : <Wallpaper>[];
 
-    final metaJson = json['meta'] as Map<String, dynamic>? ?? {};
+    final rawMeta = json['meta'];
+    final metaJson = rawMeta is Map<String, dynamic> ? rawMeta : <String, dynamic>{};
     return WallhavenResponse(
       data: dataList,
       meta: WallhavenMeta.fromJson(metaJson),
@@ -115,17 +158,18 @@ class WallhavenMeta {
   });
 
   factory WallhavenMeta.fromJson(Map<String, dynamic> json) {
-    int v(dynamic value, int fallback) {
-      if (value is int) return value;
-      if (value is String) return int.tryParse(value) ?? fallback;
-      return fallback;
-    }
-
     return WallhavenMeta(
-      currentPage: v(json['current_page'], 1),
-      lastPage: v(json['last_page'], 1),
-      perPage: v(json['per_page'], 24),
-      total: v(json['total'], 0),
+      currentPage: _int(json['current_page'], 1),
+      lastPage: _int(json['last_page'], 1),
+      perPage: _int(json['per_page'], 24),
+      total: _int(json['total'], 0),
     );
+  }
+
+  static int _int(dynamic v, int fallback) {
+    if (v is int) return v;
+    if (v is double) return v.toInt();
+    if (v is String) return int.tryParse(v) ?? fallback;
+    return fallback;
   }
 }

@@ -43,7 +43,7 @@ class _DetailScreenState extends State<DetailScreen> {
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(path != null ? 'Saved: $_filename' : 'Download started'),
+          content: Text(path != null ? 'Saved: $_filename' : 'Download failed'),
           behavior: SnackBarBehavior.floating,
           duration: const Duration(seconds: 3),
           action: path != null

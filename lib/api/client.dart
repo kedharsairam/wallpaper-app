@@ -5,6 +5,7 @@ import 'exception.dart';
 
 class WallhavenApi {
   static const _baseUrl = 'https://wallhaven.cc/api/v1';
+  static const _timeout = Duration(seconds: 15);
 
   const WallhavenApi();
 
@@ -30,13 +31,16 @@ class WallhavenApi {
     final uri = Uri.parse('$_baseUrl/search').replace(queryParameters: params);
 
     try {
-      final response = await http.get(uri, headers: {
-        'Accept': 'application/json',
-      });
+      final response = await http
+          .get(uri, headers: {'Accept': 'application/json'})
+          .timeout(_timeout);
 
       if (response.statusCode == 200) {
-        final json = jsonDecode(response.body) as Map<String, dynamic>;
-        return WallhavenResponse.fromJson(json);
+        final decoded = _decodeJson(response.body);
+        if (decoded is Map<String, dynamic>) {
+          return WallhavenResponse.fromJson(decoded);
+        }
+        throw const WallhavenException('Unexpected API response format');
       }
 
       if (response.statusCode == 429) {
@@ -46,8 +50,10 @@ class WallhavenApi {
       throw WallhavenException('API error: ${response.statusCode}');
     } on WallhavenException {
       rethrow;
+    } on http.ClientException catch (e) {
+      throw WallhavenException('Network error: ${e.message}');
     } catch (e) {
-      throw WallhavenException('Connection failed');
+      throw WallhavenException('Request failed: $e');
     }
   }
 
@@ -55,23 +61,35 @@ class WallhavenApi {
     final uri = Uri.parse('$_baseUrl/w/$id');
 
     try {
-      final response = await http.get(uri, headers: {
-        'Accept': 'application/json',
-      });
+      final response = await http
+          .get(uri, headers: {'Accept': 'application/json'})
+          .timeout(_timeout);
 
       if (response.statusCode == 200) {
-        final json = jsonDecode(response.body) as Map<String, dynamic>;
-        final data = json['data'] as Map<String, dynamic>?;
-        if (data != null) {
-          return Wallpaper.fromJson(data);
+        final decoded = _decodeJson(response.body);
+        if (decoded is Map<String, dynamic>) {
+          final data = decoded['data'];
+          if (data is Map<String, dynamic>) {
+            return Wallpaper.fromJson(data);
+          }
         }
       }
 
       return null;
     } on WallhavenException {
       rethrow;
+    } on http.ClientException catch (e) {
+      throw WallhavenException('Network error: ${e.message}');
     } catch (e) {
-      throw WallhavenException('Connection failed');
+      throw WallhavenException('Request failed: $e');
+    }
+  }
+
+  dynamic _decodeJson(String body) {
+    try {
+      return jsonDecode(body);
+    } catch (_) {
+      throw const WallhavenException('Invalid API response');
     }
   }
 }

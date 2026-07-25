@@ -11,8 +11,8 @@ void main() {
   ]);
 
   // Wallhaven API works without a key (rate limit: ~45 req/hr).
-  // To use an API key, pass it to WallhavenApi(apiKey: 'your-key')
-  // or set via --dart-define=WALLHAVEN_KEY=your-key at build time.
+  // To use an API key, set via --dart-define=WALLHAVEN_KEY=your-key
+  // at build time and pass it to the client constructor.
   final api = WallhavenApi();
 
   runApp(WallKraftApp(api: api));
