@@ -7,4 +7,10 @@ build/
 .gradle/
 .DS_Store
 
+# Android signing
+android/key.properties
+android/app/*.jks
+android/app/*.keystore
+android/app/*.jks.bk
+
 .wrangler/
