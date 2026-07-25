@@ -1,20 +1,19 @@
-// Generate a 1024x1024 app icon for WallKraft
-// Clean, geometric "W" monogram in the Apple app icon style
-// Uses only Node.js built-in modules (zlib for PNG compression)
+// Generate a 1024x500 feature graphic for Google Play Store
+// Uses only Node.js built-in modules
 
 const zlib = require('zlib');
 const fs = require('fs');
 
-const SIZE = 1024;
-const CX = SIZE / 2;
-const CY = SIZE / 2;
+const W = 1024;
+const H = 500;
+const CX = W / 2;
+const CY = H / 2;
 
-// Canvas: RGBA pixels stored as [r, g, b, a, r, g, b, a, ...]
-const pixels = Buffer.alloc(SIZE * SIZE * 4, 0);
+const pixels = Buffer.alloc(W * H * 4, 0);
 
 function setPixel(x, y, r, g, b, a = 255) {
-  if (x < 0 || x >= SIZE || y < 0 || y >= SIZE) return;
-  const i = (y * SIZE + x) * 4;
+  if (x < 0 || x >= W || y < 0 || y >= H) return;
+  const i = (y * W + x) * 4;
   pixels[i] = r;
   pixels[i + 1] = g;
   pixels[i + 2] = b;
@@ -24,12 +23,11 @@ function setPixel(x, y, r, g, b, a = 255) {
 function lerp(a, b, t) { return a + (b - a) * t; }
 function clamp(v, min, max) { return Math.max(min, Math.min(max, v)); }
 
-// Distance-based anti-aliased circle
 function drawCircle(cx, cy, radius, r, g, b, a = 255) {
   const minX = Math.max(0, Math.floor(cx - radius - 1));
-  const maxX = Math.min(SIZE - 1, Math.ceil(cx + radius + 1));
+  const maxX = Math.min(W - 1, Math.ceil(cx + radius + 1));
   const minY = Math.max(0, Math.floor(cy - radius - 1));
-  const maxY = Math.min(SIZE - 1, Math.ceil(cy + radius + 1));
+  const maxY = Math.min(H - 1, Math.ceil(cy + radius + 1));
 
   for (let y = minY; y <= maxY; y++) {
     for (let x = minX; x <= maxX; x++) {
@@ -38,7 +36,7 @@ function drawCircle(cx, cy, radius, r, g, b, a = 255) {
       const dist = Math.sqrt(dx * dx + dy * dy);
       const alpha = clamp(1 - (dist - radius + 0.5), 0, 1) * (a / 255);
       if (alpha > 0) {
-        const i = (y * SIZE + x) * 4;
+        const i = (y * W + x) * 4;
         const srcAlpha = alpha;
         const dstAlpha = pixels[i + 3] / 255;
         const outAlpha = srcAlpha + dstAlpha * (1 - srcAlpha);
@@ -53,12 +51,9 @@ function drawCircle(cx, cy, radius, r, g, b, a = 255) {
   }
 }
 
-// Anti-aliased filled polygon using edge function with distance
 function fillPolygon(points, r, g, b, a = 255) {
   if (points.length < 3) return;
-
-  // Bounding box
-  let minX = SIZE, maxX = 0, minY = SIZE, maxY = 0;
+  let minX = W, maxX = 0, minY = H, maxY = 0;
   for (const [px, py] of points) {
     minX = Math.min(minX, px);
     maxX = Math.max(maxX, px);
@@ -66,21 +61,16 @@ function fillPolygon(points, r, g, b, a = 255) {
     maxY = Math.max(maxY, py);
   }
   minX = Math.max(0, Math.floor(minX - 1));
-  maxX = Math.min(SIZE - 1, Math.ceil(maxX + 1));
+  maxX = Math.min(W - 1, Math.ceil(maxX + 1));
   minY = Math.max(0, Math.floor(minY - 1));
-  maxY = Math.min(SIZE - 1, Math.ceil(maxY + 1));
+  maxY = Math.min(H - 1, Math.ceil(maxY + 1));
 
-  // Edge functions
   const edges = [];
   for (let i = 0; i < points.length; i++) {
     const j = (i + 1) % points.length;
     const [x1, y1] = points[i];
     const [x2, y2] = points[j];
-    // Normalized edge: (x - x1)*(y2 - y1) - (y - y1)*(x2 - x1)
-    const len = Math.sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2);
-    const nx = -(y2 - y1) / len;
-    const ny = (x2 - x1) / len;
-    edges.push({ x1, y1, x2, y2, nx, ny });
+    edges.push({ x1, y1, x2, y2 });
   }
 
   for (let y = minY; y <= maxY; y++) {
@@ -90,14 +80,13 @@ function fillPolygon(points, r, g, b, a = 255) {
       for (const e of edges) {
         const val = (x - e.x1) * (e.y2 - e.y1) - (y - e.y1) * (e.x2 - e.x1);
         if (val < -1) { inside = false; break; }
-        // Distance to edge line
         const dist = val / Math.sqrt((e.y2 - e.y1) ** 2 + (e.x2 - e.x1) ** 2);
         if (dist < minDist) minDist = dist;
       }
       if (inside) {
         const alpha = clamp(1 - (-minDist + 0.5), 0, 1) * (a / 255);
         if (alpha > 0) {
-          const i = (y * SIZE + x) * 4;
+          const i = (y * W + x) * 4;
           const srcAlpha = alpha;
           const dstAlpha = pixels[i + 3] / 255;
           const outAlpha = srcAlpha + dstAlpha * (1 - srcAlpha);
@@ -113,61 +102,91 @@ function fillPolygon(points, r, g, b, a = 255) {
   }
 }
 
-// --- DRAW THE ICON ---
+// --- DRAW THE FEATURE GRAPHIC ---
 
-// Background gradient: deep navy (#0D0D1A) to dark purple (#1A0D2E)
-for (let y = 0; y < SIZE; y++) {
-  const t = y / SIZE;
+// Background gradient: dark navy to deep purple (matches icon)
+for (let y = 0; y < H; y++) {
+  const t = y / H;
   const r = Math.floor(lerp(13, 30, t));
   const g = Math.floor(lerp(13, 13, t));
   const b = Math.floor(lerp(26, 50, t));
-  for (let x = 0; x < SIZE; x++) {
+  for (let x = 0; x < W; x++) {
     setPixel(x, y, r, g, b);
   }
 }
 
-// Subtle radial glow behind the icon
-drawCircle(CX, CY, SIZE * 0.35, 40, 30, 80, 60);
+// Subtle decorative circles in the background
+drawCircle(150, 80, 200, 40, 30, 80, 30);
+drawCircle(900, 400, 180, 60, 20, 90, 25);
+drawCircle(500, 450, 150, 30, 40, 70, 20);
 
-// --- "W" Monogram ---
-// Two overlapping chevron/peak shapes forming a "W"
-// Using golden accent #FFB74D
+// "W" Monogram (left side, smaller than icon)
+const scale = 0.12;
+const s = H * scale;
+const iconCX = 180;
+const iconCY = CY;
 
-const scale = 0.28; // Size relative to canvas
-const s = SIZE * scale;
-
-// Left peak of "W"
 const leftPeak = [
-  [CX - s * 1.1, CY + s * 0.8],  // bottom-left
-  [CX - s * 0.5, CY - s * 0.8],  // top-left peak
-  [CX - s * 0.1, CY - s * 0.2],  // inner middle
-  [CX + s * 0.1, CY - s * 0.2],  // inner middle
-  [CX - s * 0.3, CY + s * 0.8],  // bottom-inner
+  [iconCX - s * 1.1, iconCY + s * 0.8],
+  [iconCX - s * 0.5, iconCY - s * 0.8],
+  [iconCX - s * 0.1, iconCY - s * 0.2],
+  [iconCX + s * 0.1, iconCY - s * 0.2],
+  [iconCX - s * 0.3, iconCY + s * 0.8],
 ];
 
-// Right peak of "W"
 const rightPeak = [
-  [CX + s * 0.3, CY + s * 0.8],  // bottom-inner
-  [CX + s * 0.1, CY - s * 0.2],  // inner middle
-  [CX + s * 0.5, CY - s * 0.8],  // top-right peak
-  [CX + s * 1.1, CY + s * 0.8],  // bottom-right
-  [CX + s * 0.7, CY + s * 0.8],  // bottom-right-inner
-  [CX + s * 0.5, CY - s * 0.4],  // inner
-  [CX + s * 0.3, CY - s * 0.1],  // inner
-  [CX + s * 0.1, CY + s * 0.8],  // bottom-inner
+  [iconCX + s * 0.3, iconCY + s * 0.8],
+  [iconCX + s * 0.1, iconCY - s * 0.2],
+  [iconCX + s * 0.5, iconCY - s * 0.8],
+  [iconCX + s * 1.1, iconCY + s * 0.8],
+  [iconCX + s * 0.7, iconCY + s * 0.8],
+  [iconCX + s * 0.5, iconCY - s * 0.4],
+  [iconCX + s * 0.3, iconCY - s * 0.1],
+  [iconCX + s * 0.1, iconCY + s * 0.8],
 ];
 
-// Fill left peak
-fillPolygon(leftPeak.map(([x, y]) => [Math.round(x), Math.round(y)]),
-  255, 183, 77);  // Golden #FFB74D
+fillPolygon(leftPeak.map(([x, y]) => [Math.round(x), Math.round(y)]), 255, 183, 77);
+fillPolygon(rightPeak.map(([x, y]) => [Math.round(x), Math.round(y)]), 255, 183, 77);
 
-// Fill right peak
-fillPolygon(rightPeak.map(([x, y]) => [Math.round(x), Math.round(y)]),
-  255, 183, 77);  // Golden #FFB74D
+// --- Text rendering using simple pixel patterns ---
+// Since we can't load fonts, we'll create a simple implied text area
+// with an underline accent bar
 
-// Subtle highlight on the peaks (slightly lighter)
-drawCircle(CX - s * 0.5, CY - s * 0.78, s * 0.06, 255, 220, 150, 160);
-drawCircle(CX + s * 0.5, CY - s * 0.78, s * 0.06, 255, 220, 150, 160);
+// App name area - a subtle background pill
+const pillX = 360;
+const pillY = CY - 40;
+const pillW = 600;
+const pillH = 80;
+const pill = [
+  [pillX, pillY],
+  [pillX + pillW, pillY],
+  [pillX + pillW, pillY + pillH],
+  [pillX, pillY + pillH],
+];
+fillPolygon(pill.map(([x, y]) => [Math.round(x), Math.round(y)]), 255, 255, 255, 20);
+
+// Accent bar under the app name area
+const bar = [
+  [CX - 150, CY + 55],
+  [CX + 150, CY + 55],
+  [CX + 150, CY + 60],
+  [CX - 150, CY + 60],
+];
+fillPolygon(bar.map(([x, y]) => [Math.round(x), Math.round(y)]), 255, 183, 77);
+
+// Tagline dots (decorative elements suggesting text)
+const dotPositions = [
+  [CX - 200, CY + 90],
+  [CX - 120, CY + 90],
+  [CX - 40, CY + 90],
+  [CX + 40, CY + 90],
+  [CX + 120, CY + 90],
+  [CX + 200, CY + 90],
+];
+
+for (const [dx, dy] of dotPositions) {
+  drawCircle(dx, dy, 3, 255, 255, 255, 120);
+}
 
 // --- ENCODE PNG ---
 
@@ -193,28 +212,25 @@ function crc32(buf) {
   return (crc ^ 0xFFFFFFFF) >>> 0;
 }
 
-// Build raw scanlines (each starts with filter byte 0)
-const rawData = Buffer.alloc(SIZE * (1 + SIZE * 4));
-for (let y = 0; y < SIZE; y++) {
-  const offset = y * (1 + SIZE * 4);
-  rawData[offset] = 0; // No filter
-  pixels.copy(rawData, offset + 1, y * SIZE * 4, (y + 1) * SIZE * 4);
+const rawData = Buffer.alloc(H * (1 + W * 4));
+for (let y = 0; y < H; y++) {
+  const offset = y * (1 + W * 4);
+  rawData[offset] = 0;
+  pixels.copy(rawData, offset + 1, y * W * 4, (y + 1) * W * 4);
 }
 
-// Compress
 const compressed = zlib.deflateSync(rawData);
 
-// Build PNG
 const signature = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]);
 
 const ihdr = Buffer.alloc(13);
-ihdr.writeUInt32BE(SIZE, 0);  // width
-ihdr.writeUInt32BE(SIZE, 4);  // height
-ihdr[8] = 8;   // bit depth
-ihdr[9] = 6;   // color type: RGBA
-ihdr[10] = 0;  // compression
-ihdr[11] = 0;  // filter
-ihdr[12] = 0;  // interlace
+ihdr.writeUInt32BE(W, 0);
+ihdr.writeUInt32BE(H, 4);
+ihdr[8] = 8;
+ihdr[9] = 6;
+ihdr[10] = 0;
+ihdr[11] = 0;
+ihdr[12] = 0;
 
 const png = Buffer.concat([
   signature,
@@ -223,7 +239,7 @@ const png = Buffer.concat([
   createChunk('IEND', Buffer.alloc(0)),
 ]);
 
-const outPath = 'C:\\Users\\kedhar\\OpenCode\\projects\\wallhaven_client\\assets\\icon_source.png';
+const outPath = 'C:\\Users\\kedhar\\OpenCode\\projects\\wallhaven_client\\assets\\feature_graphic.png';
 fs.mkdirSync('C:\\Users\\kedhar\\OpenCode\\projects\\wallhaven_client\\assets', { recursive: true });
 fs.writeFileSync(outPath, png);
-console.log(`Icon written to ${outPath} (${png.length} bytes)`);
+console.log(`Feature graphic written to ${outPath} (${png.length} bytes)`);
