@@ -21,30 +21,36 @@ dependencies:
   flutter_staggered_grid_view: ^0.7.0
   url_launcher: ^6.3.2
   shared_preferences: ^2.5.5
+  flutter_local_notifications: ^22.2.0
+  flutter_localizations:
+    sdk: flutter
+  intl: ^0.20.2
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
+  integration_test:
+    sdk: flutter
   flutter_launcher_icons: ^0.14.0
   flutter_native_splash: ^2.4.0
   flutter_lints: ^6.0.0
+  image: ^4.9.1
+  mocktail: ^1.0.5
 
 flutter_launcher_icons:
   android: true
   ios: false
   remove_alpha_ios: false
   image_path: "assets/icon_source.png"
-  adaptive_icon_background: "#1A1A2E"
-  adaptive_icon_foreground: "assets/icon_source.png"
+  adaptive_icon_background: "assets/icon_background.png"
+  adaptive_icon_foreground: "assets/icon_foreground.png"
   min_sdk_android: 21
 
 flutter_native_splash:
   color: "#0F0F0F"
-  image: "assets/icon_source.png"
   branding: null
   android_12:
     color: "#0F0F0F"
-    image: "assets/icon_source.png"
   android: true
   ios: false
   web: false
@@ -52,3 +58,9 @@ flutter_native_splash:
 
 flutter:
   uses-material-design: true
+  generate: true
+
+  assets:
+    - assets/icon_source.png
+    - assets/icon_background.png
+    - assets/icon_foreground.png

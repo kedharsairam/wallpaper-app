@@ -1,31 +1,159 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
+import '../app.dart';
+import '../services/api_key_service.dart';
+import '../services/theme_service.dart';
 import '../theme.dart';
 
-/// Apple-style settings/about bottom sheet.
+/// Apple-style About sheet with API key management.
 ///
-/// Shows version info, attribution, and legal links.
-class SettingsSheet extends StatelessWidget {
-  const SettingsSheet({super.key});
+/// Triggered from the info icon in Browse nav bar.
+/// Reloads to reflect API key changes after the sheet is dismissed.
+class SettingsSheet extends StatefulWidget {
+  final String? initialApiKey;
 
-  static Future<void> show(BuildContext context) {
-    return showModalBottomSheet(
+  const SettingsSheet({super.key, this.initialApiKey});
+
+  static Future<void> show(BuildContext context) async {
+    final key = await ApiKeyService.load();
+    if (!context.mounted) return;
+    await showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
-      builder: (_) => const SettingsSheet(),
+      builder: (_) => SettingsSheet(initialApiKey: key),
     );
   }
 
   @override
+  State<SettingsSheet> createState() => _SettingsSheetState();
+}
+
+class _SettingsSheetState extends State<SettingsSheet> {
+  String? _apiKey;
+
+  @override
+  void initState() {
+    super.initState();
+    _apiKey = widget.initialApiKey;
+  }
+
+  Future<void> _openGetKeyUrl() async {
+    final uri = Uri.parse(ApiKeyService.settingsUrl);
+    try {
+      final launched = await launchUrl(uri,
+          mode: LaunchMode.externalApplication);
+      if (!launched) {
+        debugPrint('[Settings] Failed to launch URL: $uri');
+      }
+    } catch (e) {
+      debugPrint('[Settings] URL launch error: $e');
+    }
+  }
+
+  Future<void> _showKeyDialog() async {
+    final controller = TextEditingController(text: _apiKey ?? '');
+    final saved = await showDialog<bool>(
+      context: context,
+      builder: (ctx) {
+        final isDark = Theme.of(ctx).brightness == Brightness.dark;
+        return AlertDialog(
+          backgroundColor: isDark
+              ? AppTheme.secondarySystemBackground
+              : AppTheme.lightSystemBackground,
+          title: Text('Wallhaven API Key',
+              style: TextStyle(
+                  color: isDark ? AppTheme.label : AppTheme.lightLabel)),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Paste your API key from Wallhaven settings to increase '
+                'your rate limit from 45 to 5000 requests per hour.',
+                style: TextStyle(
+                  color: isDark
+                      ? AppTheme.secondaryLabel
+                      : AppTheme.lightSecondaryLabel,
+                  fontSize: 14,
+                ),
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: controller,
+                decoration: InputDecoration(
+                  hintText: 'Paste your API key here',
+                  hintStyle: TextStyle(
+                      color: isDark
+                          ? AppTheme.tertiaryLabel
+                          : AppTheme.lightTertiaryLabel),
+                  filled: true,
+                  fillColor: isDark
+                      ? AppTheme.tertiarySystemBackground
+                      : AppTheme.lightTertiaryBackground,
+                  border: const OutlineInputBorder(
+                    borderRadius: BorderRadius.all(Radius.circular(10)),
+                    borderSide: BorderSide.none,
+                  ),
+                  contentPadding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                ),
+                style: TextStyle(
+                    color: isDark ? AppTheme.label : AppTheme.lightLabel),
+                obscureText: true,
+              ),
+            ],
+          ),
+          actions: [
+            if (_apiKey != null)
+              TextButton(
+                onPressed: () async {
+                  await ApiKeyService.save(null);
+                  if (ctx.mounted) Navigator.of(ctx).pop(true);
+                },
+                child: const Text('Remove',
+                    style: TextStyle(color: AppTheme.favoriteRed)),
+              ),
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () async {
+                final value = controller.text.trim();
+                if (value.isNotEmpty) {
+                  await ApiKeyService.save(value);
+                  if (ctx.mounted) Navigator.of(ctx).pop(true);
+                }
+              },
+              child: const Text('Save'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (saved == true && mounted) {
+      setState(() => _apiKey = null); // Force reload next time
+      // Reload the actual key from storage
+      final key = await ApiKeyService.load();
+      if (mounted) setState(() => _apiKey = key);
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final hasKey = _apiKey != null && _apiKey!.isNotEmpty;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Container(
       padding: const EdgeInsets.fromLTRB(
           AppTheme.spacing16, AppTheme.spacing20, AppTheme.spacing16, 32),
-      decoration: const BoxDecoration(
-        color: AppTheme.systemBackground,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      decoration: BoxDecoration(
+        color: isDark ? AppTheme.systemBackground : AppTheme.lightSystemBackground,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -37,31 +165,157 @@ class SettingsSheet extends StatelessWidget {
               width: 32,
               height: 4,
               decoration: BoxDecoration(
-                color: AppTheme.tertiaryLabel,
+                color: isDark
+                    ? AppTheme.tertiaryLabel
+                    : AppTheme.lightTertiaryLabel,
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
           ),
           const SizedBox(height: AppTheme.spacing20),
 
-          // About header
-          const Text('About', style: AppTheme.title2),
-          const SizedBox(height: AppTheme.spacing16),
+          // Header with app icon
+          Row(
+            children: [
+              ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: Image.asset(
+                  'assets/icon_source.png',
+                  width: 56,
+                  height: 56,
+                  fit: BoxFit.cover,
+                ),
+              ),
+              const SizedBox(width: AppTheme.spacing16),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('WallKraft', style: AppTheme.title2),
+                  const SizedBox(height: 2),
+                  Text(
+                    'Version 1.0.0 (Build 1)',
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: isDark
+                          ? AppTheme.secondaryLabel
+                          : AppTheme.lightSecondaryLabel,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+          const SizedBox(height: AppTheme.spacing20),
 
-          _infoRow('Version', '1.0.0'),
-          const Divider(),
-          _infoRow('Build', '1'),
-          const Divider(),
-          _infoRow('Platform', 'Android'),
+          // Description
+          Text(
+            'Browse, download, and favorite high-resolution wallpapers '
+            'from around the web. Powered by the Wallhaven API.',
+            style: TextStyle(
+              fontSize: 15,
+              color: isDark
+                  ? AppTheme.secondaryLabel
+                  : AppTheme.lightSecondaryLabel,
+              height: 1.4,
+            ),
+          ),
+          const SizedBox(height: AppTheme.spacing24),
 
-          // App description
-          const Padding(
-            padding: EdgeInsets.symmetric(vertical: AppTheme.spacing8),
+          // ── API Key Row ──────────────────────────────────────────
+          _settingRow(
+            hasKey ? Icons.vpn_key : Icons.vpn_key_outlined,
+            'Wallhaven API Key',
+            trailing: hasKey
+                ? const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.check_circle,
+                          size: 16, color: AppTheme.systemBlue),
+                      SizedBox(width: 4),
+                      Text(
+                        'Connected',
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: AppTheme.systemBlue,
+                        ),
+                      ),
+                    ],
+                  )
+                : Text(
+                    'Not set — 45 req/hr',
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: isDark
+                          ? AppTheme.tertiaryLabel
+                          : AppTheme.lightTertiaryLabel,
+                    ),
+                  ),
+            onTap: _showKeyDialog,
+          ),
+          const Divider(),
+
+          // Get Key link
+          Padding(
+            padding: const EdgeInsets.only(left: 34, bottom: 4),
+            child: InkWell(
+              onTap: _openGetKeyUrl,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.open_in_new,
+                        size: 14,
+                        color: isDark
+                            ? AppTheme.secondaryLabel
+                            : AppTheme.lightSecondaryLabel),
+                    const SizedBox(width: 6),
+                    Text(
+                      'Get your free key',
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: isDark
+                            ? AppTheme.secondaryLabel
+                            : AppTheme.lightSecondaryLabel,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+
+          const SizedBox(height: AppTheme.spacing8),
+
+          // ── Theme Toggle ─────────────────────────────────────────
+          _themeRow(),
+          const Divider(),
+
+          // Links
+          _settingRow(
+            Icons.open_in_new,
+            'Wallhaven API',
+            onTap: () => _openUrl('https://wallhaven.cc'),
+          ),
+          const Divider(),
+          _settingRow(
+            Icons.code,
+            'Source Code',
+            onTap: () =>
+                _openUrl('https://github.com/kedharsairam/wallpaper-app'),
+          ),
+
+          const SizedBox(height: AppTheme.spacing12),
+
+          // Footer
+          Center(
             child: Text(
-              'Browse and download high-resolution wallpapers.',
+              'Made with Flutter',
               style: TextStyle(
-                fontSize: 15,
-                color: AppTheme.secondaryLabel,
+                fontSize: 12,
+                color: isDark
+                    ? AppTheme.tertiaryLabel
+                    : AppTheme.lightTertiaryLabel,
               ),
             ),
           ),
@@ -70,31 +324,98 @@ class SettingsSheet extends StatelessWidget {
     );
   }
 
-  Widget _infoRow(String label, String value) {
+  Future<void> _openUrl(String url) async {
+    try {
+      final launched = await launchUrl(Uri.parse(url),
+          mode: LaunchMode.externalApplication);
+      if (!launched) {
+        debugPrint('[Settings] Failed to launch URL: $url');
+      }
+    } catch (e) {
+      debugPrint('[Settings] URL launch error: $e');
+    }
+  }
+
+  Widget _themeRow() {
+    final appState = WallKraftApp.of(context);
+    // Read the current theme from the app state (fallback to system).
+    final current = appState?.currentThemeMode ?? ThemeMode.system;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    const modes = ThemeMode.values;
+
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: AppTheme.spacing4),
+      padding: const EdgeInsets.symmetric(vertical: AppTheme.spacing8),
       child: Row(
         children: [
-          SizedBox(
-            width: 80,
+          Icon(ThemeService.icon(current),
+              size: 18, color: AppTheme.systemBlue),
+          const SizedBox(width: AppTheme.spacing12),
+          const Expanded(
             child: Text(
-              label,
-              style: const TextStyle(
-                color: AppTheme.secondaryLabel,
+              'Appearance',
+              style: TextStyle(
                 fontSize: 15,
-                fontWeight: FontWeight.w500,
+                color: AppTheme.systemBlue,
               ),
             ),
           ),
-          Expanded(
-            child: Text(
-              value,
-              style: const TextStyle(color: AppTheme.label, fontSize: 15),
-              textAlign: TextAlign.end,
+          DropdownButton<ThemeMode>(
+            value: current,
+            dropdownColor: isDark
+                ? AppTheme.secondarySystemBackground
+                : AppTheme.lightSecondaryBackground,
+            style: const TextStyle(
+              fontSize: 14,
+              color: AppTheme.systemBlue,
             ),
+            underline: const SizedBox(),
+            items: modes.map((mode) {
+              return DropdownMenuItem(
+                value: mode,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(ThemeService.icon(mode),
+                        size: 16, color: AppTheme.systemBlue),
+                    const SizedBox(width: 6),
+                    Text(ThemeService.label(mode)),
+                  ],
+                ),
+              );
+            }).toList(),
+            onChanged: (mode) {
+              if (mode != null) appState?.setThemeMode(mode);
+            },
           ),
         ],
       ),
     );
   }
+
+  Widget _settingRow(IconData icon, String label,
+      {Widget? trailing, VoidCallback? onTap}) {
+    return InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: AppTheme.spacing12),
+        child: Row(
+          children: [
+            Icon(icon, size: 18, color: AppTheme.systemBlue),
+            const SizedBox(width: AppTheme.spacing12),
+            Expanded(
+              child: Text(
+                label,
+                style: const TextStyle(
+                  fontSize: 15,
+                  color: AppTheme.systemBlue,
+                ),
+              ),
+            ),
+            ?trailing,
+          ],
+        ),
+      ),
+    );
+  }
+
 }

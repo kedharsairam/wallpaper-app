@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import '../api/cancel_token.dart';
 import '../api/client.dart';
 import '../api/exception.dart';
+import '../models/category.dart';
 import '../models/rate_limit.dart';
 import '../models/wallpaper.dart';
 import '../services/cache_service.dart';
@@ -11,6 +12,8 @@ import '../services/recent_searches.dart';
 import '../theme.dart';
 import '../widgets/filter_sheet.dart';
 import '../widgets/grid.dart';
+import '../widgets/empty_illustrations.dart';
+import '../widgets/empty_state.dart';
 import '../widgets/settings_sheet.dart';
 import '../widgets/shimmer_grid.dart';
 
@@ -28,6 +31,7 @@ class _BrowseScreenState extends State<BrowseScreen> {
   final _searchController = TextEditingController();
   final _searchFocus = FocusNode();
   Timer? _searchDebounce;
+  Timer? _suggestionDebounce;
   var _showSearch = false;
 
   List<Wallpaper> _wallpapers = [];
@@ -37,8 +41,10 @@ class _BrowseScreenState extends State<BrowseScreen> {
   var _page = 1;
   var _hasMore = true;
   List<String> _recentSearches = [];
+  List<String> _suggestions = [];
 
   CancelToken? _cancelToken;
+  CancelToken? _loadMoreToken;
 
   var _rateLimitDismissed = false;
 
@@ -46,8 +52,10 @@ class _BrowseScreenState extends State<BrowseScreen> {
   String _sorting = 'toplist';
   String? _topRange;
   String? _query;
+  PhotoType _photoType = PhotoType.both;
 
-  /// Cancels any in-flight request and creates a fresh cancel token.
+  /// Cancels any in-flight [search] request and creates a fresh token.
+  /// Does NOT cancel [_loadMoreToken] — pagination runs independently.
   void _cancelPreviousRequest() {
     _cancelToken?.cancel();
     _cancelToken = CancelToken();
@@ -58,15 +66,14 @@ class _BrowseScreenState extends State<BrowseScreen> {
     super.initState();
     _load();
     _scrollController.addListener(_onScroll);
-    _searchController.addListener(() {
-      if (_showSearch) setState(() {});
-    });
   }
 
   @override
   void dispose() {
     _cancelToken?.cancel();
+    _loadMoreToken?.cancel();
     _searchDebounce?.cancel();
+    _suggestionDebounce?.cancel();
     _scrollController.removeListener(_onScroll);
     _scrollController.dispose();
     _searchController.dispose();
@@ -97,6 +104,7 @@ class _BrowseScreenState extends State<BrowseScreen> {
         categories: _categories,
         sorting: _sorting,
         topRange: _topRange,
+        ratios: _photoType.apiValue,
         page: 1,
         cancelToken: _cancelToken,
       );
@@ -109,10 +117,12 @@ class _BrowseScreenState extends State<BrowseScreen> {
       // Cache raw JSON for offline fallback
       try {
         final cacheJson = {
-          'data': response.data.map((w) => _wallpaperToJson(w)).toList(),
+          'data': response.data.map(_wallpaperToJson).toList(),
         };
         await CacheService.instance.save(cacheJson);
-      } catch (_) {}
+      } catch (e) {
+        debugPrint('[Browse] Cache save failed: $e');
+      }
     } on CancelledException {
       // Request was intentionally cancelled — ignore.
     } catch (e) {
@@ -125,7 +135,7 @@ class _BrowseScreenState extends State<BrowseScreen> {
           if (rawData is List) {
             final restored = rawData
                 .whereType<Map<String, dynamic>>()
-                .map((e) => Wallpaper.fromJson(e))
+                .map(Wallpaper.fromJson)
                 .toList();
             if (restored.isNotEmpty) {
               setState(() {
@@ -152,14 +162,20 @@ class _BrowseScreenState extends State<BrowseScreen> {
     if (_page < 1) return;
     setState(() => _isLoadingMore = true);
     final next = _page + 1;
+
+    // Use a dedicated token so pagination isn't cancelled by _load().
+    _loadMoreToken?.cancel();
+    _loadMoreToken = CancelToken();
+
     try {
       final response = await widget.api.search(
         query: _query,
         categories: _categories,
         sorting: _sorting,
         topRange: _topRange,
+        ratios: _photoType.apiValue,
         page: next,
-        cancelToken: _cancelToken,
+        cancelToken: _loadMoreToken,
       );
       if (!mounted) return;
       setState(() {
@@ -173,15 +189,9 @@ class _BrowseScreenState extends State<BrowseScreen> {
     } catch (e) {
       if (!mounted) return;
       setState(() => _isLoadingMore = false);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Failed to load more: $e',
-                style: const TextStyle(color: AppTheme.label)),
-            backgroundColor: AppTheme.systemBackground,
-          ),
-        );
-      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to load more: $e')),
+      );
     }
   }
 
@@ -194,17 +204,31 @@ class _BrowseScreenState extends State<BrowseScreen> {
       await RecentSearchesService.save(_query!);
     }
 
+    setState(() => _suggestions = []);
     _searchDebounce?.cancel();
     _load();
-    // Keep search visible with the query — user dismissed via Escape/X.
   }
 
   /// Debounced search-as-you-type handler.
   void _onSearchChanged(String value) {
     _searchDebounce?.cancel();
+    _suggestionDebounce?.cancel();
+    final trimmed = value.trim();
+    if (trimmed.isEmpty) {
+      setState(() => _suggestions = []);
+      return;
+    }
+
+    // Fetch autocomplete suggestions after a short pause.
+    _suggestionDebounce = Timer(const Duration(milliseconds: 200), () {
+      widget.api.suggestions(trimmed).then((results) {
+        if (mounted) setState(() => _suggestions = results);
+      });
+    });
+
+    // Trigger search after debounce.
     _searchDebounce = Timer(const Duration(milliseconds: 300), () {
-      final trimmed = value.trim();
-      _query = trimmed.isNotEmpty ? trimmed : null;
+      _query = trimmed;
       _load();
     });
   }
@@ -214,8 +238,8 @@ class _BrowseScreenState extends State<BrowseScreen> {
       _showSearch = true;
       _recentSearches = [];
     });
-    _recentSearches = await RecentSearchesService.load();
-    if (mounted) setState(() {});
+    final searches = await RecentSearchesService.load();
+    if (mounted) setState(() => _recentSearches = searches);
     WidgetsBinding.instance
         .addPostFrameCallback((_) => _searchFocus.requestFocus());
   }
@@ -234,6 +258,7 @@ class _BrowseScreenState extends State<BrowseScreen> {
     setState(() {
       _showSearch = false;
       _recentSearches = [];
+      _suggestions = [];
     });
     _searchController.clear();
     _searchFocus.unfocus();
@@ -253,18 +278,20 @@ class _BrowseScreenState extends State<BrowseScreen> {
       categories: _categories,
       sorting: _sorting,
       topRange: _topRange,
-      onApply: (categories, sorting, topRange) {
+      photoType: _photoType,
+      onApply: (categories, sorting, topRange, photoType) {
         setState(() {
           _categories = categories;
           _sorting = sorting;
           _topRange = topRange;
+          _photoType = photoType;
+          // Clear search query when applying filters so they don't overlap.
+          _query = null;
+          _showSearch = false;
         });
-        _load();
         _searchController.clear();
-        if (mounted) {
-          setState(() => _showSearch = false);
-          _searchFocus.unfocus();
-        }
+        _searchFocus.unfocus();
+        _load();
       },
     );
   }
@@ -273,48 +300,48 @@ class _BrowseScreenState extends State<BrowseScreen> {
   Widget build(BuildContext context) {
     return CallbackShortcuts(
       bindings: {
-        SingleActivator(LogicalKeyboardKey.keyR): _load,
-        SingleActivator(LogicalKeyboardKey.keyR, control: true): _load,
-        SingleActivator(LogicalKeyboardKey.escape): () {
+        const SingleActivator(LogicalKeyboardKey.keyR): _load,
+        const SingleActivator(LogicalKeyboardKey.keyR, control: true): _load,
+        const SingleActivator(LogicalKeyboardKey.escape): () {
           if (_showSearch) _closeSearch();
         },
-        SingleActivator(LogicalKeyboardKey.keyF, control: true): _openSearch,
-        SingleActivator(LogicalKeyboardKey.home): _scrollToTop,
-        SingleActivator(LogicalKeyboardKey.arrowUp, control: true):
+        const SingleActivator(LogicalKeyboardKey.keyF, control: true): _openSearch,
+        const SingleActivator(LogicalKeyboardKey.home): _scrollToTop,
+        const SingleActivator(LogicalKeyboardKey.arrowUp, control: true):
             _scrollToTop,
       },
       child: Focus(
         autofocus: true,
-        child: Scaffold(
-          backgroundColor: AppTheme.background,
-          appBar: AppBar(
-            title: _showSearch ? _buildSearchField() : const Text('WallKraft'),
-            actions: [
-              if (_showSearch)
-                TextButton(
-                  onPressed: _closeSearch,
-                  child: const Text('Cancel',
-                      style: TextStyle(color: AppTheme.systemBlue)),
-                )
-              else
-                IconButton(
-                  icon: const Icon(Icons.search, color: AppTheme.secondaryLabel),
-                  tooltip: 'Search',
-                  onPressed: _openSearch,
-                ),
-                IconButton(
-                  icon: const Icon(Icons.tune, color: AppTheme.secondaryLabel),
-                  tooltip: 'Filters',
-                  onPressed: _openFilters,
-                ),
-                IconButton(
-                  icon: const Icon(Icons.settings_outlined,
-                      color: AppTheme.secondaryLabel),
-                  tooltip: 'Settings',
-                  onPressed: _openSettings,
-                ),
-            ],
-          ),
+          child: Scaffold(
+            backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+            appBar: AppBar(
+              title: _showSearch ? _buildSearchField() : const Text('WallKraft'),
+              centerTitle: true,
+              actions: [
+                if (_showSearch)
+                  TextButton(
+                    onPressed: _closeSearch,
+                    child: const Text('Cancel',
+                        style: TextStyle(color: AppTheme.systemBlue)),
+                  )
+                else
+                  IconButton(
+                    icon: const Icon(Icons.search),
+                    tooltip: 'Search',
+                    onPressed: _openSearch,
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.tune),
+                    tooltip: 'Filters',
+                    onPressed: _openFilters,
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.info_outline),
+                    tooltip: 'About',
+                    onPressed: _openSettings,
+                  ),
+              ],
+            ),
           body: _body(),
         ),
       ),
@@ -322,26 +349,40 @@ class _BrowseScreenState extends State<BrowseScreen> {
   }
 
   Widget _buildSearchField() {
-    return Container(
-      key: const ValueKey('search-field'),
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return SizedBox(
       height: 36,
-      decoration: BoxDecoration(
-        color: AppTheme.secondarySystemBackground,
-        borderRadius: BorderRadius.circular(10),
-      ),
       child: TextField(
+        key: const ValueKey('search-field'),
         controller: _searchController,
         focusNode: _searchFocus,
-        textAlignVertical: TextAlignVertical.center,
-        style: const TextStyle(color: AppTheme.label, fontSize: 16),
-        decoration: const InputDecoration(
+        cursorColor: AppTheme.systemBlue,
+        style: TextStyle(
+          color: isDark ? AppTheme.label : AppTheme.lightLabel,
+          fontSize: 16,
+          height: 1.2,
+        ),
+        decoration: InputDecoration(
           hintText: 'Search wallpapers',
-          hintStyle: TextStyle(color: AppTheme.tertiaryLabel),
-          border: InputBorder.none,
-          contentPadding: EdgeInsets.symmetric(vertical: 8),
+          hintStyle: TextStyle(
+              color: isDark ? AppTheme.tertiaryLabel : AppTheme.lightTertiaryLabel),
+          filled: true,
+          fillColor: isDark
+              ? AppTheme.secondarySystemBackground
+              : AppTheme.lightSecondaryBackground,
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(10),
+            borderSide: BorderSide.none,
+          ),
+          contentPadding: const EdgeInsets.symmetric(vertical: 0, horizontal: 12),
           isDense: true,
-          prefixIcon:
-              Icon(Icons.search, color: AppTheme.secondaryLabel, size: 20),
+          prefixIconConstraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+          prefixIcon: Padding(
+            padding: const EdgeInsets.only(left: 8, right: 4),
+            child: Icon(Icons.search,
+                color: isDark ? AppTheme.secondaryLabel : AppTheme.lightSecondaryLabel,
+                size: 18),
+          ),
         ),
         textInputAction: TextInputAction.search,
         onChanged: _onSearchChanged,
@@ -401,8 +442,10 @@ class _BrowseScreenState extends State<BrowseScreen> {
     final banner = _buildRateLimitBanner();
     Widget content;
 
-    // Show recent searches when search is focused and no query yet
-    if (_showSearch && _query == null && _wallpapers.isEmpty && _recentSearches.isNotEmpty) {
+    // Show search suggestions when user is typing
+    if (_showSearch && _query != null && _suggestions.isNotEmpty) {
+      content = _buildSuggestions();
+    } else if (_showSearch && _query == null && _wallpapers.isEmpty && _recentSearches.isNotEmpty) {
       content = _buildRecentSearches();
     } else if (_error != null) {
       content = _buildErrorState();
@@ -416,11 +459,28 @@ class _BrowseScreenState extends State<BrowseScreen> {
           isLoadingMore: _isLoadingMore,
           hasMore: _hasMore,
           scrollController: _scrollController,
-          onTap: (wallpaper) {
-            Navigator.pushNamed(context, '/detail', arguments: {
-              'api': widget.api,
-              'wallpaper': wallpaper,
-            });
+          onTap: (wallpaper) async {
+            final result = await Navigator.pushNamed<Map<String, dynamic>>(
+              context,
+              '/detail',
+              arguments: {
+                'api': widget.api,
+                'wallpaper': wallpaper,
+              },
+            );
+            if (!mounted) return;
+            // Handle tag search from detail screen
+            if (result != null && result['searchTag'] is String) {
+              final tag = result['searchTag'] as String;
+              setState(() {
+                _query = tag;
+                _showSearch = true;
+              });
+              _searchController.text = tag;
+              _searchFocus.requestFocus();
+              await RecentSearchesService.save(tag);
+              _load();
+            }
           },
         ),
       );
@@ -436,19 +496,22 @@ class _BrowseScreenState extends State<BrowseScreen> {
   }
 
   Widget _buildErrorState() {
+    final theme = Theme.of(context);
     return Center(
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: AppTheme.spacing32),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.cloud_off,
-                size: 48, color: AppTheme.tertiaryLabel),
+            Icon(Icons.cloud_off,
+                size: 48,
+                color: theme.colorScheme.onSurface.withValues(alpha: 0.3)),
             const SizedBox(height: AppTheme.spacing12),
             Text(
-              _error!,
+              _error ?? 'An unknown error occurred',
               textAlign: TextAlign.center,
-              style: const TextStyle(color: AppTheme.secondaryLabel),
+              style: TextStyle(
+                  color: theme.colorScheme.onSurface.withValues(alpha: 0.6)),
             ),
             const SizedBox(height: AppTheme.spacing16),
             TextButton(
@@ -466,6 +529,7 @@ class _BrowseScreenState extends State<BrowseScreen> {
   }
 
   Widget _buildRecentSearches() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Padding(
       padding: const EdgeInsets.fromLTRB(
           AppTheme.spacing16, AppTheme.spacing12, AppTheme.spacing16, 0),
@@ -474,11 +538,13 @@ class _BrowseScreenState extends State<BrowseScreen> {
         children: [
           Row(
             children: [
-              const Text('Recent Searches',
+              Text('Recent Searches',
                   style: TextStyle(
                     fontSize: 15,
                     fontWeight: FontWeight.w600,
-                    color: AppTheme.secondaryLabel,
+                    color: isDark
+                        ? AppTheme.secondaryLabel
+                        : AppTheme.lightSecondaryLabel,
                   )),
               const Spacer(),
               GestureDetector(
@@ -503,15 +569,22 @@ class _BrowseScreenState extends State<BrowseScreen> {
                 onTap: () => _executeRecentSearch(query),
                 child: Chip(
                   label: Text(query,
-                      style: const TextStyle(
-                          fontSize: 13, color: AppTheme.label)),
-                  backgroundColor: AppTheme.secondarySystemBackground,
-                  deleteIcon: const Icon(Icons.close,
-                      size: 14, color: AppTheme.tertiaryLabel),
+                      style: TextStyle(
+                          fontSize: 13,
+                          color:
+                              isDark ? AppTheme.label : AppTheme.lightLabel)),
+                  backgroundColor: isDark
+                      ? AppTheme.secondarySystemBackground
+                      : AppTheme.lightSecondaryBackground,
+                  deleteIcon: Icon(Icons.close,
+                      size: 14,
+                      color: isDark
+                          ? AppTheme.tertiaryLabel
+                          : AppTheme.lightTertiaryLabel),
                   onDeleted: () async {
                     await RecentSearchesService.remove(query);
-                    setState(
-                        () => _recentSearches = List.from(_recentSearches)..remove(query));
+                    setState(() => _recentSearches =
+                        List.from(_recentSearches)..remove(query));
                   },
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(20),
@@ -529,13 +602,41 @@ class _BrowseScreenState extends State<BrowseScreen> {
     );
   }
 
+  Widget _buildSuggestions() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return ListView.separated(
+      padding: const EdgeInsets.fromLTRB(
+          AppTheme.spacing16, AppTheme.spacing8, AppTheme.spacing16, 0),
+      itemCount: _suggestions.length,
+      separatorBuilder: (_, _) => const Divider(height: 1),
+      itemBuilder: (context, index) {
+        final suggestion = _suggestions[index];
+        return ListTile(
+          dense: true,
+          leading: Icon(Icons.search,
+              size: 18,
+              color: isDark
+                  ? AppTheme.tertiaryLabel
+                  : AppTheme.lightTertiaryLabel),
+          title: Text(suggestion,
+              style: TextStyle(
+                  fontSize: 15,
+                  color: isDark ? AppTheme.label : AppTheme.lightLabel)),
+          onTap: () {
+            _onSearchSubmitted(suggestion);
+            setState(() => _suggestions = []);
+          },
+        );
+      },
+    );
+  }
+
   void _executeRecentSearch(String query) {
     _query = query;
     _searchController.text = query;
-    _showSearch = false;
-    _searchFocus.unfocus();
+    _showSearch = true;
+    _searchFocus.requestFocus();
     _load();
-    setState(() {});
   }
 
   /// Serializes a wallpaper to a plain JSON-compatible map for caching.
@@ -561,31 +662,10 @@ class _BrowseScreenState extends State<BrowseScreen> {
 
   Widget _buildEmptyState() {
     final queryText = _query != null ? ' for "$_query"' : '';
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: AppTheme.spacing32),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(Icons.photo_library_outlined,
-                size: 48, color: AppTheme.tertiaryLabel),
-            const SizedBox(height: AppTheme.spacing12),
-            Text(
-              'No wallpapers found$queryText',
-              textAlign: TextAlign.center,
-              style: TextStyle(color: AppTheme.secondaryLabel),
-            ),
-            const SizedBox(height: AppTheme.spacing4),
-            const Text(
-              'Try adjusting your search or filters',
-              textAlign: TextAlign.center,
-              style: TextStyle(color: AppTheme.tertiaryLabel, fontSize: 13),
-            ),
-          ],
-        ),
-      ),
+    return EmptyState(
+      illustration: _query != null ? Illustration.search : Illustration.browse,
+      title: 'No wallpapers found$queryText',
+      subtitle: 'Try adjusting your search or filters',
     );
   }
 }
-
-

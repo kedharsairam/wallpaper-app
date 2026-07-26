@@ -43,6 +43,19 @@ enum SortOption {
   }
 }
 
+/// Photo orientation filter.
+///
+/// Maps to the `ratios` API parameter for aspect-ratio-based filtering.
+enum PhotoType {
+  both('All', null),
+  portrait('Portrait', '9x16,2x3,3x4,10x16'),
+  landscape('Landscape', '16x9,4x3,3x2,16x10');
+
+  final String label;
+  final String? apiValue; // null = no filter (returns both)
+  const PhotoType(this.label, this.apiValue);
+}
+
 /// Top range filter for ranking-based sorting.
 enum TopRange {
   past24h('Past 24h', '1d'),

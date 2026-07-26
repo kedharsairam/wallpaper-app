@@ -37,19 +37,21 @@ class _ShimmerGridState extends State<ShimmerGrid>
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: Column(
-        children: [
-          const SizedBox(height: 8),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(child: _buildColumn(0.7, 0.9, 1.3, 0.8)),
-              const SizedBox(width: 8),
-              Expanded(child: _buildColumn(1.1, 0.7, 0.8, 1.0)),
-            ],
-          ),
-        ],
+      padding: const EdgeInsets.all(8),
+      child: SingleChildScrollView(
+        child: Column(
+          children: [
+            const SizedBox(height: 8),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(child: _buildColumn(0.7, 0.9, 0.5, 0.8)),
+                const SizedBox(width: 8),
+                Expanded(child: _buildColumn(0.5, 0.7, 0.6, 0.6)),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }

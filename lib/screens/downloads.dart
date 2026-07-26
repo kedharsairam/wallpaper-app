@@ -4,6 +4,8 @@ import 'package:flutter/services.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import '../theme.dart';
+import '../widgets/empty_illustrations.dart';
+import '../widgets/empty_state.dart';
 
 class DownloadsScreen extends StatefulWidget {
   final VoidCallback? onBrowseTap;
@@ -15,7 +17,7 @@ class DownloadsScreen extends StatefulWidget {
 }
 
 class DownloadsScreenState extends State<DownloadsScreen> {
-  List<FileSystemEntity> _files = [];
+  List<_DownloadEntry> _entries = [];
   var _isLoading = true;
 
   /// Refresh the downloads list from disk.
@@ -34,31 +36,34 @@ class DownloadsScreenState extends State<DownloadsScreen> {
       final dir = Directory(docsDir.path);
       if (await dir.exists()) {
         final entities = await dir.list().toList();
-        final downloads = <FileSystemEntity>[];
+        final downloads = <_DownloadEntry>[];
         for (final e in entities) {
           if (e is File && p.basename(e.path).startsWith('wallkraft-')) {
-            downloads.add(e);
+            // Collect stat asynchronously to avoid blocking the UI thread.
+            try {
+              final stat = await e.stat();
+              downloads.add(_DownloadEntry(e, stat));
+            } catch (e) {
+              debugPrint('[Downloads] Stat failed: $e');
+            }
           }
         }
-        downloads.sort((a, b) {
-          final statA = a.statSync();
-          final statB = b.statSync();
-          return statB.modified.compareTo(statA.modified);
-        });
-        if (mounted) setState(() => _files = downloads);
+        downloads.sort((a, b) => b.stat.modified.compareTo(a.stat.modified));
+        if (mounted) setState(() => _entries = downloads);
       } else {
-        if (mounted) setState(() => _files = []);
+        if (mounted) setState(() => _entries = []);
       }
-    } catch (_) {
-      if (mounted) setState(() => _files = []);
+    } catch (e) {
+      debugPrint('[Downloads] Load failed: $e');
+      if (mounted) setState(() => _entries = []);
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
   }
 
-  Future<void> _deleteFile(FileSystemEntity entity) async {
+  Future<void> _deleteFile(_DownloadEntry entry) async {
     try {
-      await entity.delete();
+      await entry.file.delete();
       HapticFeedback.lightImpact();
       _loadDownloads();
     } catch (e) {
@@ -79,48 +84,26 @@ class DownloadsScreenState extends State<DownloadsScreen> {
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
-      return const Center(
+      return Center(
         child: SizedBox(
           width: 24,
           height: 24,
           child: CircularProgressIndicator(
-            color: AppTheme.secondaryLabel,
+            color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
             strokeWidth: 2,
           ),
         ),
       );
     }
 
-    if (_files.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(Icons.cloud_off,
-                size: 48, color: AppTheme.tertiaryLabel),
-            const SizedBox(height: AppTheme.spacing12),
-            const Text(
-              'No downloads',
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.w600,
-                color: AppTheme.label,
-              ),
-            ),
-            const SizedBox(height: AppTheme.spacing4),
-            const Text(
-              'Download wallpapers to see them here',
-              style: TextStyle(
-                fontSize: 15,
-                color: AppTheme.secondaryLabel,
-              ),
-            ),
-            const SizedBox(height: AppTheme.spacing16),
-            TextButton(
-              onPressed: widget.onBrowseTap,
-              child: const Text('Browse Wallpapers'),
-            ),
-          ],
+    if (_entries.isEmpty) {
+      return EmptyState(
+        illustration: Illustration.downloads,
+        title: 'No downloads',
+        subtitle: 'Download wallpapers to see them here',
+        action: TextButton(
+          onPressed: widget.onBrowseTap,
+          child: const Text('Browse Wallpapers'),
         ),
       );
     }
@@ -129,15 +112,14 @@ class DownloadsScreenState extends State<DownloadsScreen> {
       onRefresh: _loadDownloads,
       child: ListView.separated(
         padding: const EdgeInsets.symmetric(vertical: AppTheme.spacing8),
-        itemCount: _files.length,
+        itemCount: _entries.length,
         separatorBuilder: (_, _) =>
             const Divider(height: 1, indent: 72),
         itemBuilder: (context, index) {
-          final entity = _files[index];
-          final name = p.basename(entity.path);
-          final stat = entity.statSync();
+          final entry = _entries[index];
+          final name = p.basename(entry.file.path);
           return Dismissible(
-            key: ValueKey(entity.path),
+            key: ValueKey(entry.file.path),
             direction: DismissDirection.endToStart,
             background: Container(
               alignment: Alignment.centerRight,
@@ -145,38 +127,58 @@ class DownloadsScreenState extends State<DownloadsScreen> {
               color: Colors.redAccent,
               child: const Icon(Icons.delete_outline, color: Colors.white),
             ),
-            onDismissed: (_) => _deleteFile(entity),
+            onDismissed: (_) => _deleteFile(entry),
             child: ListTile(
             leading: ClipRRect(
               borderRadius: BorderRadius.circular(6),
               child: Image.file(
-                File(entity.path),
+                entry.file,
                 width: 56,
                 height: 56,
                 fit: BoxFit.cover,
-                errorBuilder: (_, _, _) => Container(
-                  color: AppTheme.tertiarySystemBackground,
-                  child: const Icon(Icons.broken_image,
-                      color: AppTheme.tertiaryLabel),
-                ),
+                cacheWidth: 112,
+                cacheHeight: 112,
+                errorBuilder: (_, _, _) {
+                  final isDark = Theme.of(context).brightness == Brightness.dark;
+                  return Container(
+                    color: isDark
+                        ? AppTheme.tertiarySystemBackground
+                        : AppTheme.lightTertiaryBackground,
+                    child: Icon(Icons.broken_image,
+                        color: isDark
+                            ? AppTheme.tertiaryLabel
+                            : AppTheme.lightTertiaryLabel),
+                  );
+                },
               ),
             ),
             title: Text(
               name,
-              style: const TextStyle(fontSize: 15, color: AppTheme.label),
+              style: TextStyle(
+                fontSize: 15,
+                color: Theme.of(context).colorScheme.onSurface,
+              ),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
             ),
             subtitle: Text(
-              _formatSize(stat.size),
-              style: const TextStyle(
-                  fontSize: 13, color: AppTheme.secondaryLabel),
+              _formatSize(entry.stat.size),
+              style: TextStyle(
+                fontSize: 13,
+                color: Theme.of(context)
+                    .colorScheme
+                    .onSurface
+                    .withValues(alpha: 0.6),
+              ),
             ),
             trailing: IconButton(
-              icon: const Icon(Icons.delete_outline,
-                  color: AppTheme.secondaryLabel),
+              icon: Icon(Icons.delete_outline,
+                  color: Theme.of(context)
+                      .colorScheme
+                      .onSurface
+                      .withValues(alpha: 0.6)),
               tooltip: 'Delete',
-              onPressed: () => _deleteFile(entity),
+              onPressed: () => _deleteFile(entry),
             ),
           ),
           );
@@ -184,4 +186,13 @@ class DownloadsScreenState extends State<DownloadsScreen> {
       ),
     );
   }
+}
+
+/// A downloaded file paired with its cached [FileStat] to avoid
+/// blocking the UI thread with synchronous stat calls during build.
+class _DownloadEntry {
+  final File file;
+  final FileStat stat;
+
+  const _DownloadEntry(this.file, this.stat);
 }

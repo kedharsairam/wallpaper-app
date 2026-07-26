@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
 /// Platform channel for setting wallpapers on Android.
@@ -19,7 +20,8 @@ class WallpaperSetter {
         'which': which,
       });
       return true;
-    } catch (_) {
+    } catch (e) {
+      debugPrint('[WallpaperSetter] Failed to set wallpaper: $e');
       return false;
     }
   }

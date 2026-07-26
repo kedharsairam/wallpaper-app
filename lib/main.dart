@@ -1,11 +1,12 @@
-import 'dart:io' show Platform;
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'api/client.dart';
 import 'app.dart';
+import 'services/notification_service.dart';
 import 'services/update_checker.dart';
+import 'services/db_init_stub.dart'
+    if (dart.library.io) 'services/db_init_io.dart';
 
 void main() {
   // ── Global error boundary ──────────────────────────────────────────
@@ -24,12 +25,13 @@ void main() {
 
   WidgetsFlutterBinding.ensureInitialized();
 
+  // ── Download notifications ────────────────────────────────────────
+  NotificationService.instance.init();
+
   // ── Desktop database backend ──────────────────────────────────────
   // sqflite uses platform channels on mobile; on desktop we need FFI.
-  if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
-    sqfliteFfiInit();
-    databaseFactory = databaseFactoryFfi;
-  }
+  // On web, this is a no-op (stub).
+  initDesktopDatabase();
 
   // ── Image cache limit ──────────────────────────────────────────────
   // Prevents unbounded memory growth from decoded images.
@@ -42,9 +44,9 @@ void main() {
   ]);
 
   // Works without an API key (rate limit: ~45 req/hr).
-  // To use an API key, set via --dart-define=WALLHAVEN_KEY=your-key
-  // at build time and pass it to the client constructor.
-  final api = WallpaperApi();
+  // Users can paste their Wallhaven API key in Settings to raise
+  // the limit to ~5000 req/hr. The key is loaded automatically.
+  const api = WallpaperApi();
   final updater = UpdateChecker(currentVersion: '1.0.0');
 
   runApp(WallKraftApp(api: api, updater: updater));

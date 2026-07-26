@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:sqflite/sqflite.dart';
@@ -14,10 +15,17 @@ import '../models/wallpaper.dart';
 class WallKraftDatabase {
   static const _version = 1;
   static Database? _db;
+  static final _initCompleter = Completer<void>();
 
   static Future<Database> get instance async {
     if (_db != null) return _db!;
-    _db = await _open();
+    // Serialize concurrent access via a one-shot completer.
+    if (!_initCompleter.isCompleted) {
+      _db = await _open();
+      _initCompleter.complete();
+    } else {
+      await _initCompleter.future;
+    }
     return _db!;
   }
 
@@ -30,9 +38,8 @@ class WallKraftDatabase {
       version: _version,
       onCreate: (db, version) async => _createTables(db),
       onUpgrade: (db, oldVersion, newVersion) async {
-        if (oldVersion < 2) {
-          // Future: ALTER TABLE favorites ADD COLUMN note TEXT;
-        }
+        // When adding new migrations, replace the condition below:
+        // if (oldVersion < 2 && newVersion >= 2) { ... }
       },
       onConfigure: (db) async {
         await db.execute('PRAGMA foreign_keys = ON');
@@ -62,65 +69,103 @@ class WallKraftDatabase {
 
   static Future<List<Wallpaper>> getFavorites() async {
     final db = await instance;
-    final rows = await db.query('favorites', orderBy: 'saved_at DESC');
-    return rows.map((row) {
-      final data = jsonDecode(row['data'] as String) as Map<String, dynamic>;
-      return Wallpaper.fromJson(data);
-    }).toList();
+    try {
+      final rows = await db.query('favorites', orderBy: 'saved_at DESC');
+      return rows.map((row) {
+        final raw = row['data'];
+        if (raw is! String) return null;
+        final decoded = jsonDecode(raw);
+        if (decoded is! Map<String, dynamic>) return null;
+        return Wallpaper.fromJson(decoded);
+      }).whereType<Wallpaper>().toList();
+    } catch (e) {
+      debugPrint('[DB] getFavorites failed: $e');
+      return [];
+    }
   }
 
   static Future<bool> isFavorite(String id) async {
     final db = await instance;
-    final result = await db.query(
-      'favorites',
-      where: 'id = ?',
-      whereArgs: [id],
-      limit: 1,
-    );
-    return result.isNotEmpty;
+    try {
+      final result = await db.query(
+        'favorites',
+        where: 'id = ?',
+        whereArgs: [id],
+        limit: 1,
+      );
+      return result.isNotEmpty;
+    } catch (e) {
+      debugPrint('[DB] isFavorite failed: $e');
+      return false;
+    }
   }
 
   static Future<void> addFavorite(Wallpaper wallpaper) async {
     final db = await instance;
-    await db.insert(
-      'favorites',
-      {
-        'id': wallpaper.id,
-        'data': jsonEncode(_wallpaperToMap(wallpaper)),
-        'saved_at': DateTime.now().millisecondsSinceEpoch,
-      },
-      conflictAlgorithm: ConflictAlgorithm.replace,
-    );
+    try {
+      await db.insert(
+        'favorites',
+        {
+          'id': wallpaper.id,
+          'data': jsonEncode(_wallpaperToMap(wallpaper)),
+          'saved_at': DateTime.now().millisecondsSinceEpoch,
+        },
+        conflictAlgorithm: ConflictAlgorithm.replace,
+      );
+    } catch (e) {
+      debugPrint('[DB] addFavorite failed: $e');
+      rethrow;
+    }
   }
 
   static Future<void> removeFavorite(String id) async {
     final db = await instance;
-    await db.delete('favorites', where: 'id = ?', whereArgs: [id]);
+    try {
+      await db.delete('favorites', where: 'id = ?', whereArgs: [id]);
+    } catch (e) {
+      debugPrint('[DB] removeFavorite failed: $e');
+      rethrow;
+    }
   }
 
   // ── Downloads ─────────────────────────────────────────────────────
 
   static Future<void> recordDownload(String id, String path) async {
     final db = await instance;
-    await db.insert(
-      'downloads',
-      {
-        'id': id,
-        'path': path,
-        'saved_at': DateTime.now().millisecondsSinceEpoch,
-      },
-      conflictAlgorithm: ConflictAlgorithm.replace,
-    );
+    try {
+      await db.insert(
+        'downloads',
+        {
+          'id': id,
+          'path': path,
+          'saved_at': DateTime.now().millisecondsSinceEpoch,
+        },
+        conflictAlgorithm: ConflictAlgorithm.replace,
+      );
+    } catch (e) {
+      debugPrint('[DB] recordDownload failed: $e');
+      rethrow;
+    }
   }
 
   static Future<List<Map<String, dynamic>>> getDownloads() async {
     final db = await instance;
-    return db.query('downloads', orderBy: 'saved_at DESC');
+    try {
+      return db.query('downloads', orderBy: 'saved_at DESC');
+    } catch (e) {
+      debugPrint('[DB] getDownloads failed: $e');
+      return [];
+    }
   }
 
   static Future<void> removeDownload(String id) async {
     final db = await instance;
-    await db.delete('downloads', where: 'id = ?', whereArgs: [id]);
+    try {
+      await db.delete('downloads', where: 'id = ?', whereArgs: [id]);
+    } catch (e) {
+      debugPrint('[DB] removeDownload failed: $e');
+      rethrow;
+    }
   }
 
   // ── Serialization ─────────────────────────────────────────────────

@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart';
+import 'package:share_plus/share_plus.dart';
 import '../models/wallpaper.dart';
+import '../services/download_manager.dart';
 import '../theme.dart';
 import '../helpers/responsive.dart';
 
@@ -58,14 +60,14 @@ class _LoadMoreIndicator extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Padding(
-      padding: EdgeInsets.all(AppTheme.spacing16),
+    return Padding(
+      padding: const EdgeInsets.all(AppTheme.spacing16),
       child: Center(
         child: SizedBox(
           width: 20,
           height: 20,
           child: CircularProgressIndicator(
-            color: AppTheme.secondaryLabel,
+            color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
             strokeWidth: 2,
           ),
         ),
@@ -143,13 +145,19 @@ class _MasonryTileState extends State<_MasonryTile>
 
   void _onContextShare(Wallpaper w) async {
     try {
-      await Clipboard.setData(ClipboardData(text: w.path));
+      // Download the file first, then share it.
+      final path = await DownloadManager.instance.download(w);
+      await Share.shareXFiles(
+        [XFile(path)],
+        text: 'Wallpaper via WallKraft',
+      );
+    } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Image URL copied')),
+          SnackBar(content: Text('Share failed: $e')),
         );
       }
-    } catch (_) {}
+    }
   }
 
   void _onContextCopyLink(Wallpaper w) async {
@@ -160,7 +168,13 @@ class _MasonryTileState extends State<_MasonryTile>
           const SnackBar(content: Text('Link copied')),
         );
       }
-    } catch (_) {}
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Copy failed: $e')),
+        );
+      }
+    }
   }
 
   @override
@@ -176,6 +190,7 @@ class _MasonryTileState extends State<_MasonryTile>
     return GestureDetector(
       onTap: widget.onTap,
       onSecondaryTap: () => _showContextMenu(context),
+      onLongPress: () => _showContextMenu(context),
       onTapDown: (_) => _tapController.forward(),
       onTapUp: (_) => _tapController.reverse(),
       onTapCancel: () => _tapController.reverse(),
@@ -202,7 +217,7 @@ class _MasonryTileState extends State<_MasonryTile>
                     fit: BoxFit.cover,
                     memCacheWidth: tileWidth,
                     placeholder: (_, _) => const _TilePlaceholder(),
-                    errorWidget: (_, _, _) => const _TilePlaceholder(),
+                    errorWidget: (_, _, _) => const _TileError(),
                   ),
                   Positioned(
                     bottom: 0,
@@ -270,6 +285,26 @@ class _TilePlaceholder extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(color: AppTheme.tilePlaceholder);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Container(
+        color: isDark ? AppTheme.tilePlaceholder : AppTheme.lightTilePlaceholder);
+  }
+}
+
+class _TileError extends StatelessWidget {
+  const _TileError();
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Container(
+      color: isDark ? AppTheme.tilePlaceholder : AppTheme.lightTilePlaceholder,
+      child: Center(
+        child: Icon(Icons.broken_image,
+            size: 20,
+            color:
+                isDark ? AppTheme.tertiaryLabel : AppTheme.lightTertiaryLabel),
+      ),
+    );
   }
 }

@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 /// Manages recent search queries using SharedPreferences.
@@ -17,7 +18,8 @@ class RecentSearchesService {
     try {
       final list = jsonDecode(raw) as List;
       return list.cast<String>();
-    } catch (_) {
+    } catch (e) {
+      debugPrint('[RecentSearches] Load failed: $e');
       return [];
     }
   }

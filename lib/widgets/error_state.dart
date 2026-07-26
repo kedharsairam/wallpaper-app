@@ -16,18 +16,22 @@ class ErrorState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     return Center(
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: AppTheme.spacing32),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, size: 48, color: AppTheme.tertiaryLabel),
+            Icon(icon, size: 48,
+                color: cs.onSurface.withValues(alpha: 0.3)),
             const SizedBox(height: AppTheme.spacing12),
             Text(
               message,
               textAlign: TextAlign.center,
-              style: AppTheme.body.copyWith(color: AppTheme.secondaryLabel),
+              style: TextStyle(
+                  color: cs.onSurface.withValues(alpha: 0.6),
+                  fontSize: 17),
             ),
             if (onRetry != null) ...[
               const SizedBox(height: AppTheme.spacing16),
@@ -41,7 +45,7 @@ class ErrorState extends StatelessWidget {
                   ),
                   minimumSize: const Size(0, AppTheme.spacing44),
                 ),
-                child: const Text('Retry', style: AppTheme.body),
+                child: const Text('Retry'),
               ),
             ],
           ],

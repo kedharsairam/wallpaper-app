@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import '../models/wallpaper.dart';
 import '../services/database.dart';
-import '../theme.dart';
+
+import '../widgets/empty_illustrations.dart';
+import '../widgets/empty_state.dart';
 import '../widgets/grid.dart';
 
 class FavoritesScreen extends StatefulWidget {
@@ -31,7 +33,8 @@ class FavoritesScreenState extends State<FavoritesScreen> {
     try {
       final faves = await WallKraftDatabase.getFavorites();
       if (mounted) setState(() => _favorites = faves);
-    } catch (_) {
+    } catch (e) {
+      debugPrint('[Favorites] Load failed: $e');
       if (mounted) setState(() => _favorites = []);
     } finally {
       if (mounted) setState(() => _isLoading = false);
@@ -49,12 +52,12 @@ class FavoritesScreenState extends State<FavoritesScreen> {
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
-      return const Center(
+      return Center(
         child: SizedBox(
           width: 24,
           height: 24,
           child: CircularProgressIndicator(
-            color: AppTheme.secondaryLabel,
+            color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
             strokeWidth: 2,
           ),
         ),
@@ -62,35 +65,13 @@ class FavoritesScreenState extends State<FavoritesScreen> {
     }
 
     if (_favorites.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(Icons.favorite_border,
-                size: 48, color: AppTheme.tertiaryLabel),
-            const SizedBox(height: AppTheme.spacing12),
-            const Text(
-              'No favorites',
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.w600,
-                color: AppTheme.label,
-              ),
-            ),
-            const SizedBox(height: AppTheme.spacing4),
-            const Text(
-              'Favorite wallpapers to see them here',
-              style: TextStyle(
-                fontSize: 15,
-                color: AppTheme.secondaryLabel,
-              ),
-            ),
-            const SizedBox(height: AppTheme.spacing16),
-            TextButton(
-              onPressed: widget.onBrowseTap,
-              child: const Text('Browse Wallpapers'),
-            ),
-          ],
+      return EmptyState(
+        illustration: Illustration.favorites,
+        title: 'No favorites',
+        subtitle: 'Favorite wallpapers to see them here',
+        action: TextButton(
+          onPressed: widget.onBrowseTap,
+          child: const Text('Browse Wallpapers'),
         ),
       );
     }

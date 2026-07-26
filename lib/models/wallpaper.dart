@@ -35,7 +35,7 @@ class Wallpaper {
     final tagsList = rawTags is List
         ? rawTags
             .whereType<Map<String, dynamic>>()
-            .map((e) => Tag.fromJson(e))
+            .map(Tag.fromJson)
             .toList()
         : <Tag>[];
 
@@ -134,7 +134,7 @@ class WallpaperResponse {
     final dataList = rawData is List
         ? rawData
             .whereType<Map<String, dynamic>>()
-            .map((e) => Wallpaper.fromJson(e))
+            .map(Wallpaper.fromJson)
             .toList()
         : <Wallpaper>[];
 

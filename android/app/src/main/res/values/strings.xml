@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="shortcut_search">Search</string>
+    <string name="shortcut_search_long">Search wallpapers</string>
+    <string name="shortcut_favorites">Favorites</string>
+    <string name="shortcut_favorites_long">View favorites</string>
+    <string name="shortcut_downloads">Downloads</string>
+    <string name="shortcut_downloads_long">View downloads</string>
+</resources>

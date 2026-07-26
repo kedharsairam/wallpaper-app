@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 
 /// Checks GitHub Releases for newer versions of WallKraft.
@@ -8,9 +9,16 @@ import 'dart:convert';
 /// github.com/kedharsairam/wallpaper-app and compares it
 /// against the current version. If a newer version exists,
 /// the caller can show an update prompt.
+///
+/// To avoid hitting GitHub API rate limits (60 req/hr unauthenticated),
+/// the result is cached in SharedPreferences and only re-checked
+/// once every 24 hours per session.
 class UpdateChecker {
   static const _repo = 'kedharsairam/wallpaper-app';
   static const _apiUrl = 'https://api.github.com/repos/$_repo/releases/latest';
+  static const _cacheKey = 'update_check_result';
+  static const _cacheTimeKey = 'update_check_time';
+  static const _cacheDuration = Duration(hours: 24);
 
   /// The current app version (from pubspec.yaml).
   /// Format: "1.0.0"
@@ -23,41 +31,89 @@ class UpdateChecker {
   /// Returns the latest version string (e.g., "1.1.0") if newer,
   /// or `null` if already up-to-date or the check fails.
   Future<String?> checkForUpdate() async {
+    // Return cached result if fresh enough.
+    final cached = await _getCachedResult();
+    if (cached != null) return cached;
+
     try {
-      final response = await http.get(
-        Uri.parse(_apiUrl),
-        headers: {'Accept': 'application/vnd.github.v3+json'},
-      );
+      final response = await http
+          .get(
+            Uri.parse(_apiUrl),
+            headers: {'Accept': 'application/vnd.github.v3+json'},
+          )
+          .timeout(const Duration(seconds: 10));
 
       if (response.statusCode != 200) {
         debugPrint('[Update] API returned ${response.statusCode}');
         return null;
       }
 
-      final data = jsonDecode(response.body) as Map<String, dynamic>;
-      final tagName = data['tag_name'] as String? ?? '';
+      final decoded = jsonDecode(response.body);
+      if (decoded is! Map<String, dynamic>) {
+        debugPrint('[Update] Unexpected API response format');
+        return null;
+      }
+
+      final tagName = decoded['tag_name'];
+      if (tagName is! String) return null;
+
       // Strip "v" prefix: "v1.1.0" → "1.1.0"
-      final latestVersion = tagName.startsWith('v')
-          ? tagName.substring(1)
-          : tagName;
+      final latestVersion =
+          tagName.startsWith('v') ? tagName.substring(1) : tagName;
 
       if (latestVersion.isEmpty) return null;
 
+      String? result;
       if (_compareVersions(latestVersion, currentVersion) > 0) {
-        return latestVersion;
+        result = latestVersion;
       }
 
-      return null;
+      await _cacheResult(result);
+      return result;
     } catch (e) {
       debugPrint('[Update] Check failed: $e');
       return null;
     }
   }
 
+  Future<String?> _getCachedResult() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final cachedTime = prefs.getInt(_cacheTimeKey);
+      if (cachedTime == null) return null;
+      final age = DateTime.now().millisecondsSinceEpoch - cachedTime;
+      if (age > _cacheDuration.inMilliseconds) return null;
+      final cached = prefs.getString(_cacheKey);
+      // Empty string means "checked recently, no update found".
+      if (cached == null || cached.isEmpty) return null;
+      return cached;
+    } catch (e) {
+      debugPrint('[UpdateChecker] Cache read failed: $e');
+      return null;
+    }
+  }
+
+  Future<void> _cacheResult(String? result) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_cacheKey, result ?? '');
+      await prefs.setInt(_cacheTimeKey, DateTime.now().millisecondsSinceEpoch);
+    } catch (e) {
+      debugPrint('[UpdateChecker] Cache write failed: $e');
+    }
+  }
+
   /// Returns > 0 if [a] is newer than [b], < 0 if older, 0 if equal.
   static int _compareVersions(String a, String b) {
-    final aParts = a.split('.').map(int.tryParse).whereNotNull().toList();
-    final bParts = b.split('.').map(int.tryParse).whereNotNull().toList();
+    // Strip any pre-release suffix (e.g., "1.2.3-beta" → "1.2.3").
+    String clean(String s) => s.split(RegExp(r'[-\+]')).first;
+    final aClean = clean(a);
+    final bClean = clean(b);
+
+    final aParts =
+        aClean.split('.').map(int.tryParse).whereNotNull().toList();
+    final bParts =
+        bClean.split('.').map(int.tryParse).whereNotNull().toList();
 
     for (var i = 0; i < aParts.length && i < bParts.length; i++) {
       if (aParts[i] != bParts[i]) return aParts[i] - bParts[i];

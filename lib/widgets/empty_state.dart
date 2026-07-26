@@ -1,21 +1,23 @@
 import 'package:flutter/material.dart';
 import '../theme.dart';
+import 'empty_illustrations.dart';
 
-/// Apple-style empty state with icon, title, optional subtitle, and optional action.
+/// Apple-style empty state with optional custom vector illustration,
+/// title, optional subtitle, and optional action button.
 class EmptyState extends StatelessWidget {
-  final IconData icon;
   final String title;
   final String? subtitle;
   final Widget? action;
-  final double iconSize;
+  final IconData? icon;
+  final Illustration? illustration;
 
   const EmptyState({
     super.key,
-    required this.icon,
     required this.title,
     this.subtitle,
     this.action,
-    this.iconSize = 48,
+    this.icon,
+    this.illustration,
   });
 
   @override
@@ -26,19 +28,31 @@ class EmptyState extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, size: iconSize, color: AppTheme.tertiaryLabel),
+            if (illustration != null)
+              EmptyIllustration(
+                type: illustration!,
+                size: 100,
+              )
+            else if (icon != null)
+              Icon(icon, size: 48,
+                  color: AppTheme.of(context, AppTheme.tertiaryLabel,
+                      AppTheme.lightTertiaryLabel)),
             const SizedBox(height: AppTheme.spacing16),
             Text(
               title,
               textAlign: TextAlign.center,
-              style: AppTheme.callout.copyWith(color: AppTheme.secondaryLabel),
+              style: AppTheme.callout.copyWith(
+                  color: AppTheme.of(
+                      context, AppTheme.secondaryLabel, AppTheme.lightSecondaryLabel)),
             ),
             if (subtitle != null) ...[
               const SizedBox(height: AppTheme.spacing4),
               Text(
                 subtitle!,
                 textAlign: TextAlign.center,
-                style: AppTheme.footnote.copyWith(color: AppTheme.tertiaryLabel),
+                style: AppTheme.footnote.copyWith(
+                    color: AppTheme.of(
+                        context, AppTheme.tertiaryLabel, AppTheme.lightTertiaryLabel)),
               ),
             ],
             if (action != null) ...[

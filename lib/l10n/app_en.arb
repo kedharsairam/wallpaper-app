@@ -1,0 +1,304 @@
+{
+  "@@last_modified": "2026-07-26",
+  "appTitle": "WallKraft",
+  "@appTitle": {
+    "description": "The application name"
+  },
+
+  "@@locale": "en",
+
+  "tabBrowse": "Browse",
+  "@tabBrowse": {
+    "description": "Bottom navigation tab: browse wallpapers"
+  },
+  "tabFavorites": "Favorites",
+  "@tabFavorites": {
+    "description": "Bottom navigation tab: favorite wallpapers"
+  },
+  "tabDownloads": "Downloads",
+  "@tabDownloads": {
+    "description": "Bottom navigation tab: downloaded wallpapers"
+  },
+
+  "searchHint": "Search wallpapers",
+  "@searchHint": {
+    "description": "Hint text in the search field"
+  },
+  "searchRecentTitle": "Recent Searches",
+  "@searchRecentTitle": {
+    "description": "Title above the list of recent searches"
+  },
+  "searchClearAll": "Clear All",
+  "@searchClearAll": {
+    "description": "Button to clear all recent searches"
+  },
+
+  "emptyFavoritesTitle": "No favorites yet",
+  "@emptyFavoritesTitle": {
+    "description": "Title shown when favorites list is empty"
+  },
+  "emptyFavoritesSubtitle": "Browse wallpapers and tap the heart icon to save your favorites here.",
+  "@emptyFavoritesSubtitle": {
+    "description": "Subtitle shown when favorites list is empty"
+  },
+  "emptyDownloadsTitle": "No downloads yet",
+  "@emptyDownloadsTitle": {
+    "description": "Title shown when downloads list is empty"
+  },
+  "emptyDownloadsSubtitle": "Download wallpapers from the detail screen and they will appear here.",
+  "@emptyDownloadsSubtitle": {
+    "description": "Subtitle shown when downloads list is empty"
+  },
+  "emptySearchTitle": "No results found",
+  "@emptySearchTitle": {
+    "description": "Title shown when search returns no results"
+  },
+  "emptySearchSubtitle": "Try a different search term or adjust your filters.",
+  "@emptySearchSubtitle": {
+    "description": "Subtitle shown when search returns no results"
+  },
+  "emptyBrowseTitle": "No wallpapers yet",
+  "@emptyBrowseTitle": {
+    "description": "Title shown when browse screen has no wallpapers"
+  },
+
+  "retry": "Retry",
+  "@retry": {
+    "description": "Retry button after an error"
+  },
+  "failedLoadMore": "Failed to load more: {error}",
+  "@failedLoadMore": {
+    "description": "Error shown when pagination fails",
+    "placeholders": {
+      "error": {
+        "type": "String",
+        "example": "Network error"
+      }
+    }
+  },
+  "shareFailed": "Share failed: {error}",
+  "@shareFailed": {
+    "description": "Error shown when sharing fails",
+    "placeholders": {
+      "error": {
+        "type": "String",
+        "example": "No app found"
+      }
+    }
+  },
+  "shareText": "Wallpaper via WallKraft",
+  "@shareText": {
+    "description": "Text attached when sharing a wallpaper"
+  },
+  "copyFailed": "Copy failed: {error}",
+  "@copyFailed": {
+    "description": "Error shown when clipboard copy fails",
+    "placeholders": {
+      "error": {
+        "type": "String",
+        "example": "Permission denied"
+      }
+    }
+  },
+  "linkCopied": "Link copied",
+  "@linkCopied": {
+    "description": "Confirmation when link is copied to clipboard"
+  },
+
+  "contextDetail": "Open Detail",
+  "@contextDetail": {
+    "description": "Context menu: open wallpaper detail"
+  },
+  "contextDownload": "Download",
+  "@contextDownload": {
+    "description": "Context menu: download wallpaper"
+  },
+  "contextShare": "Share",
+  "@contextShare": {
+    "description": "Context menu: share wallpaper"
+  },
+  "contextCopyLink": "Copy Link",
+  "@contextCopyLink": {
+    "description": "Context menu: copy wallpaper URL"
+  },
+
+  "preparingShare": "Preparing image…",
+  "@preparingShare": {
+    "description": "Loading message shown while preparing image for sharing"
+  },
+  "updateAvailable": "WallKraft {version} is available",
+  "@updateAvailable": {
+    "description": "Notification shown when a new version is available",
+    "placeholders": {
+      "version": {
+        "type": "String",
+        "example": "1.1.0"
+      }
+    }
+  },
+  "updateAction": "Update",
+  "@updateAction": {
+    "description": "Button to navigate to update URL"
+  },
+  "couldNotOpenBrowser": "Could not open browser",
+  "@couldNotOpenBrowser": {
+    "description": "Error shown when the browser cannot be opened"
+  },
+
+  "rateLimitReached": "Rate limit reached. Resets {time}.",
+  "@rateLimitReached": {
+    "description": "Shown when API rate limit is exceeded",
+    "placeholders": {
+      "time": {
+        "type": "String",
+        "example": "in 15 minutes"
+      }
+    }
+  },
+  "rateLimitRemaining": "API calls: {count} remaining",
+  "@rateLimitRemaining": {
+    "description": "Shows remaining API call count",
+    "placeholders": {
+      "count": {
+        "type": "int",
+        "example": "42"
+      }
+    }
+  },
+
+  "settingsApiKey": "API Key",
+  "@settingsApiKey": {
+    "description": "Settings: API key section title"
+  },
+  "settingsApiKeyHint": "Paste your Wallhaven API key",
+  "@settingsApiKeyHint": {
+    "description": "Hint in the API key text field"
+  },
+  "settingsApiKeySet": "Set API Key",
+  "@settingsApiKeySet": {
+    "description": "Button to save the API key"
+  },
+  "settingsApiKeyCleared": "API key cleared",
+  "@settingsApiKeyCleared": {
+    "description": "Confirmation when API key is cleared"
+  },
+  "settingsGetKey": "Get your free key",
+  "@settingsGetKey": {
+    "description": "Link to get a Wallhaven API key"
+  },
+  "settingsAppearance": "Appearance",
+  "@settingsAppearance": {
+    "description": "Settings: appearance section title"
+  },
+  "appearanceSystem": "System",
+  "@appearanceSystem": {
+    "description": "Theme mode: follow system"
+  },
+  "appearanceDark": "Dark",
+  "@appearanceDark": {
+    "description": "Theme mode: dark"
+  },
+  "appearanceLight": "Light",
+  "@appearanceLight": {
+    "description": "Theme mode: light"
+  },
+
+  "filtersCategories": "Categories",
+  "@filtersCategories": {
+    "description": "Filter sheet: categories section"
+  },
+  "filtersGeneral": "General",
+  "@filtersGeneral": {
+    "description": "Filter category: general"
+  },
+  "filtersAnime": "Anime",
+  "@filtersAnime": {
+    "description": "Filter category: anime"
+  },
+  "filtersPeople": "People",
+  "@filtersPeople": {
+    "description": "Filter category: people"
+  },
+  "filtersSorting": "Sorting",
+  "@filtersSorting": {
+    "description": "Filter sheet: sorting section"
+  },
+  "filtersToplist": "Toplist",
+  "@filtersToplist": {
+    "description": "Sort option: toplist"
+  },
+  "filtersDateAdded": "Date Added",
+  "@filtersDateAdded": {
+    "description": "Sort option: date added"
+  },
+  "filtersRelevance": "Relevance",
+  "@filtersRelevance": {
+    "description": "Sort option: relevance"
+  },
+  "filtersRandom": "Random",
+  "@filtersRandom": {
+    "description": "Sort option: random"
+  },
+  "filtersMostViewed": "Most Viewed",
+  "@filtersMostViewed": {
+    "description": "Sort option: most viewed"
+  },
+  "filtersMostFavorited": "Most Favorited",
+  "@filtersMostFavorited": {
+    "description": "Sort option: most favorited"
+  },
+  "filtersPhotoType": "Photo Type",
+  "@filtersPhotoType": {
+    "description": "Filter sheet: photo type section"
+  },
+  "filtersBoth": "Both",
+  "@filtersBoth": {
+    "description": "Photo type: both wallpapers and photos"
+  },
+  "filtersWallpapers": "Wallpapers",
+  "@filtersWallpapers": {
+    "description": "Photo type: wallpapers only"
+  },
+  "filtersPhotos": "Photos",
+  "@filtersPhotos": {
+    "description": "Photo type: photos only"
+  },
+
+  "filterApply": "Apply",
+  "@filterApply": {
+    "description": "Filter sheet: apply button"
+  },
+  "filterReset": "Reset",
+  "@filterReset": {
+    "description": "Filter sheet: reset button"
+  },
+
+  "detailDownload": "Download",
+  "@detailDownload": {
+    "description": "Detail screen: download button"
+  },
+  "detailShare": "Share",
+  "@detailShare": {
+    "description": "Detail screen: share button"
+  },
+  "detailSetWallpaper": "Set Wallpaper",
+  "@detailSetWallpaper": {
+    "description": "Detail screen: set as wallpaper action"
+  },
+  "detailHomeScreen": "Home Screen",
+  "@detailHomeScreen": {
+    "description": "Set wallpaper target: home screen"
+  },
+  "detailLockScreen": "Lock Screen",
+  "@detailLockScreen": {
+    "description": "Set wallpaper target: lock screen"
+  },
+  "detailBoth": "Both",
+  "@detailBoth": {
+    "description": "Set wallpaper target: both home and lock screen"
+  },
+  "detailFavorites": "Favorites",
+  "@detailFavorites": {
+    "description": "Detail screen: favorites count label"
+  }
+}

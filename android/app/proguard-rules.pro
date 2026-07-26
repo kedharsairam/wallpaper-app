@@ -1,16 +1,16 @@
-# WallKraft ProGuard / R8 Rules
-# Prevents model classes from being stripped during release builds.
-
-# Keep all data model classes (used for JSON serialization)
+# Flutter ProGuard Rules for WallKraft
+# Keep all model/serialization classes (used with jsonEncode/jsonDecode).
+-keep class com.wallkraft.app.** { *; }
 -keep class com.wallkraft.app.models.** { *; }
 
-# Keep all app classes (catch-all for safety)
--keep class com.wallkraft.app.** { *; }
+# Keep Kotlin serialization.
+-keepattributes *Annotation*, InnerClasses
+-dontnote kotlinx.serialization.AnnotationsKt
 
-# Keep annotations (for any future annotation-based processing)
--keepattributes *Annotation*
-
-# Keep Gson/JSON serialization fields (if used)
--keepclassmembers class * {
-    @com.google.gson.annotations.SerializedName <fields>;
-}
+# Keep Flutter engine classes.
+-keep class io.flutter.app.** { *; }
+-keep class io.flutter.plugin.**  { *; }
+-keep class io.flutter.util.**  { *; }
+-keep class io.flutter.view.**  { *; }
+-keep class io.flutter.**  { *; }
+-keep class io.flutter.plugins.**  { *; }
