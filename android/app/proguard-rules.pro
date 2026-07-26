@@ -14,3 +14,6 @@
 -keep class io.flutter.view.**  { *; }
 -keep class io.flutter.**  { *; }
 -keep class io.flutter.plugins.**  { *; }
+
+# Keep Play Core classes (needed by Flutter's split install / deferred components).
+-keep class com.google.android.play.core.** { *; }
