@@ -64,6 +64,9 @@ android {
 
 dependencies {
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.5")
+    // Play Core — provides SplitCompat / SplitInstall classes referenced by
+    // Flutter's engine (FlutterPlayStoreSplitApplication). Required by R8 full mode.
+    implementation("com.google.android.play:core:1.10.3")
 }
 
 kotlin {
