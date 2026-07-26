@@ -1,6 +1,7 @@
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'api/client.dart';
 import 'app.dart';
 import 'services/notification_service.dart';
@@ -43,11 +44,29 @@ void main() {
     DeviceOrientation.portraitDown,
   ]);
 
+  // ── Bootstrap with dynamic version ─────────────────────────────────
+  _runApp();
+}
+
+/// Reads the installed app version and launches the app.
+///
+/// Uses [PackageInfo.fromPlatform] so the version is always in sync
+/// with the installed APK — no hardcoded strings to forget.
+Future<void> _runApp() async {
+  String currentVersion;
+  try {
+    final info = await PackageInfo.fromPlatform();
+    currentVersion = info.version;
+  } catch (e) {
+    debugPrint('[Version] Failed to read package info: $e');
+    currentVersion = '0.0.0';
+  }
+
   // Works without an API key (rate limit: ~45 req/hr).
   // Users can paste their Wallhaven API key in Settings to raise
   // the limit to ~5000 req/hr. The key is loaded automatically.
   const api = WallpaperApi();
-  final updater = UpdateChecker(currentVersion: '1.0.0');
+  final updater = UpdateChecker(currentVersion: currentVersion);
 
   runApp(WallKraftApp(api: api, updater: updater));
 }

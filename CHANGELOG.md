@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.1.1] — 2026-07-27
+
+### Fixed
+- **Update checker false positive**: Version was hardcoded to `1.0.0` in `main.dart` — the checker always saw a "newer" release. Now reads dynamically from `PackageInfo.fromPlatform()` so it always matches the installed APK version.
+
 ## [1.1.0] — 2026-07-27
 
 ### Added
