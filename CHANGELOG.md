@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.1.5] — 2026-07-27
+
+### Fixed
+- **Wallpaper tap not opening**: `flutter_staggered_grid_view` has a known hit-testing issue where `GestureDetector` inside its items doesn't always register taps. Replaced with `InkWell` which integrates correctly with the Material widget hierarchy and works reliably within staggered grid layout.
+
 ## [1.1.4] — 2026-07-27
 
 ### Fixed
