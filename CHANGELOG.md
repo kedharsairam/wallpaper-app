@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.3] — 2026-07-27
+
+### Changed
+- **Upgraded `package_info_plus`** from 9.0.1 to 10.2.1 (uses Built-in Kotlin — no KGP warning).
+- **Upgraded `share_plus`** from 10.1.4 to 13.3.0 (uses Built-in Kotlin — no KGP warning).
+- **Share API**: `Share.shareXFiles()` → `SharePlus.instance.share(ShareParams(...))`.
+
 ## [1.1.2] — 2026-07-27
 
 ### Fixed
