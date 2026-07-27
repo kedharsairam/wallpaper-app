@@ -4,6 +4,7 @@ import 'api/client.dart';
 import 'screens/browse.dart';
 import 'screens/favorites.dart';
 import 'screens/downloads.dart';
+import 'screens/settings_screen.dart';
 import 'screens/detail.dart';
 import 'services/update_checker.dart';
 import 'services/theme_service.dart';
@@ -70,7 +71,7 @@ class WallKraftAppState extends State<WallKraftApp> {
       home: _MainScaffold(api: widget.api, updater: widget.updater),
       onGenerateRoute: (settings) {
         if (settings.name == '/detail') {
-          return MaterialPageRoute(
+          return MaterialPageRoute<Map<String, dynamic>>(
             settings: settings,
             builder: (context) => const DetailScreen(),
           );
@@ -192,6 +193,7 @@ class _MainScaffoldState extends State<_MainScaffold>
           BrowseScreen(api: widget.api),
           FavoritesScreen(key: _favKey, onBrowseTap: _switchToBrowse),
           DownloadsScreen(key: _dlKey, onBrowseTap: _switchToBrowse),
+          const SettingsScreen(),
         ],
       ),
       bottomNavigationBar: DecoratedBox(
@@ -223,6 +225,11 @@ class _MainScaffoldState extends State<_MainScaffold>
               icon: Icon(Icons.download_outlined),
               activeIcon: Icon(Icons.download),
               label: 'Downloads',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.settings_outlined),
+              activeIcon: Icon(Icons.settings),
+              label: 'Settings',
             ),
           ],
         ),

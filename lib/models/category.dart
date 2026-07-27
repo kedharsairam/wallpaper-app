@@ -58,11 +58,8 @@ enum PhotoType {
 
 /// Top range filter for ranking-based sorting.
 enum TopRange {
-  past24h('Past 24h', '1d'),
-  past3Days('Past 3 days', '3d'),
   pastWeek('Past week', '1w'),
   pastMonth('Past month', '1M'),
-  past3Months('Past 3 months', '3M'),
   past6Months('Past 6 months', '6M'),
   pastYear('Past year', '1y');
 

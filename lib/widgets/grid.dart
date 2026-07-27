@@ -19,6 +19,7 @@ class WallpaperGrid extends StatelessWidget {
   final bool hasMore;
   final ScrollController? scrollController;
   final void Function(Wallpaper) onTap;
+  final double? forcedAspectRatio;
 
   const WallpaperGrid({
     super.key,
@@ -27,6 +28,7 @@ class WallpaperGrid extends StatelessWidget {
     this.hasMore = true,
     this.scrollController,
     required this.onTap,
+    this.forcedAspectRatio,
   });
 
   @override
@@ -48,6 +50,7 @@ class WallpaperGrid extends StatelessWidget {
           child: _MasonryTile(
             wallpaper: wallpapers[index],
             onTap: () => onTap(wallpapers[index]),
+            forcedAspectRatio: forcedAspectRatio,
           ),
         );
       },
@@ -76,42 +79,19 @@ class _LoadMoreIndicator extends StatelessWidget {
   }
 }
 
-class _MasonryTile extends StatefulWidget {
+class _MasonryTile extends StatelessWidget {
   final Wallpaper wallpaper;
   final VoidCallback onTap;
+  final double? forcedAspectRatio;
 
-  const _MasonryTile({required this.wallpaper, required this.onTap});
-
-  @override
-  State<_MasonryTile> createState() => _MasonryTileState();
-}
-
-class _MasonryTileState extends State<_MasonryTile>
-    with SingleTickerProviderStateMixin {
-  late AnimationController _tapController;
-  late Animation<double> _tapAnimation;
-
-  @override
-  void initState() {
-    super.initState();
-    _tapController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 100),
-      reverseDuration: const Duration(milliseconds: 100),
-    );
-    _tapAnimation = Tween<double>(begin: 1.0, end: 0.95).animate(
-      CurvedAnimation(parent: _tapController, curve: Curves.easeInOut),
-    );
-  }
-
-  @override
-  void dispose() {
-    _tapController.dispose();
-    super.dispose();
-  }
+  const _MasonryTile({
+    required this.wallpaper,
+    required this.onTap,
+    this.forcedAspectRatio,
+  });
 
   void _showContextMenu(BuildContext context) {
-    final w = widget.wallpaper;
+    final w = wallpaper;
     final renderBox = context.findRenderObject() as RenderBox?;
     final offset = renderBox?.localToGlobal(Offset.zero) ?? Offset.zero;
     showMenu<String>(
@@ -129,21 +109,21 @@ class _MasonryTileState extends State<_MasonryTile>
         const PopupMenuItem(value: 'copy', child: Text('Copy Link')),
       ],
     ).then((value) {
-      if (value == null) return;
+      if (value == null || !context.mounted) return;
       switch (value) {
         case 'detail':
-          widget.onTap();
+          onTap();
         case 'download':
-          widget.onTap(); // Navigate to detail for download
+          onTap(); // Navigate to detail for download
         case 'share':
-          _onContextShare(w);
+          _onContextShare(context, w);
         case 'copy':
-          _onContextCopyLink(w);
+          _onContextCopyLink(context, w);
       }
     });
   }
 
-  void _onContextShare(Wallpaper w) async {
+  void _onContextShare(BuildContext context, Wallpaper w) async {
     try {
       // Download the file first, then share it.
       final path = await DownloadManager.instance.download(w);
@@ -154,7 +134,7 @@ class _MasonryTileState extends State<_MasonryTile>
         ),
       );
     } catch (e) {
-      if (mounted) {
+      if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Share failed: $e')),
         );
@@ -162,16 +142,16 @@ class _MasonryTileState extends State<_MasonryTile>
     }
   }
 
-  void _onContextCopyLink(Wallpaper w) async {
+  void _onContextCopyLink(BuildContext context, Wallpaper w) async {
     try {
       await Clipboard.setData(ClipboardData(text: w.path));
-      if (mounted) {
+      if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Link copied')),
         );
       }
     } catch (e) {
-      if (mounted) {
+      if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Copy failed: $e')),
         );
@@ -181,98 +161,85 @@ class _MasonryTileState extends State<_MasonryTile>
 
   @override
   Widget build(BuildContext context) {
-    final w = widget.wallpaper;
-    final aspectRatio =
-        (w.dimensionX > 0 && w.dimensionY > 0)
+    final w = wallpaper;
+    final aspectRatio = forcedAspectRatio ??
+        ((w.dimensionX > 0 && w.dimensionY > 0)
             ? w.dimensionX / w.dimensionY
-            : 1.0;
+            : 1.0);
 
     final tileWidth = Responsive.gridTileWidth(context);
 
-    return InkWell(
-      onTap: widget.onTap,
+    return GestureDetector(
+      onTap: onTap,
       onLongPress: () => _showContextMenu(context),
-      borderRadius: BorderRadius.circular(12),
-      splashColor: Theme.of(context).colorScheme.primary.withValues(alpha: 0.15),
-      highlightColor: Colors.transparent,
-      onTapDown: (_) => _tapController.forward(),
-      onTapUp: (_) => _tapController.reverse(),
-      onTapCancel: () => _tapController.reverse(),
-      child: AnimatedBuilder(
-          animation: _tapAnimation,
-          builder: (context, child) => Transform.scale(
-            scale: _tapAnimation.value,
-            transformHitTests: false,
-            child: child,
-          ),
-          child: Semantics(
-            label: 'Wallpaper ${w.resolution}',
-            child: Hero(
-              tag: 'wallpaper-${w.id}',
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(12),
-                child: AspectRatio(
-                  aspectRatio: aspectRatio,
-                  child: Stack(
-                    fit: StackFit.expand,
-                    children: [
-                      CachedNetworkImage(
-                        imageUrl: w.thumbnailOriginal ?? w.thumbnail,
-                        fit: BoxFit.cover,
-                        memCacheWidth: tileWidth,
-                        placeholder: (_, _) => const _TilePlaceholder(),
-                        errorWidget: (_, _, _) => const _TileError(),
+      behavior: HitTestBehavior.translucent,
+      child: Semantics(
+        label: 'Wallpaper ${w.resolution}',
+        child: Hero(
+          tag: 'wallpaper-${w.id}',
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(12),
+            child: AspectRatio(
+              aspectRatio: aspectRatio,
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  CachedNetworkImage(
+                    imageUrl: w.thumbnailOriginal ?? w.thumbnail,
+                    fit: BoxFit.cover,
+                    memCacheWidth: tileWidth,
+                    placeholder: (_, _) => const _TilePlaceholder(),
+                    errorWidget: (_, _, _) => const _TileError(),
+                  ),
+                  Positioned(
+                    bottom: 0,
+                    left: 0,
+                    right: 0,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: AppTheme.spacing8,
+                        vertical: 6,
                       ),
-                      Positioned(
-                        bottom: 0,
-                        left: 0,
-                        right: 0,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: AppTheme.spacing8,
-                            vertical: 6,
-                          ),
-                          decoration: const BoxDecoration(
-                            gradient: LinearGradient(
-                              begin: Alignment.bottomCenter,
-                              end: Alignment.topCenter,
-                              colors: [
-                                Color(0xCC000000),
-                                Colors.transparent,
-                              ],
-                            ),
-                          ),
-                          child: Row(
-                            children: [
-                              const Icon(Icons.favorite,
-                                  size: 12, color: Color(0xCCFFFFFF)),
-                              const SizedBox(width: 4),
-                              Text(
-                                _formatCount(w.favorites),
-                                style: const TextStyle(
-                                  color: Color(0xCCFFFFFF),
-                                  fontSize: 11,
-                                ),
-                              ),
-                              const Spacer(),
-                              Text(
-                                w.resolution,
-                                style: const TextStyle(
-                                  color: Color(0xCCFFFFFF),
-                                  fontSize: 11,
-                                ),
-                              ),
-                            ],
-                          ),
+                      decoration: const BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.bottomCenter,
+                          end: Alignment.topCenter,
+                          colors: [
+                            Color(0xCC000000),
+                            Colors.transparent,
+                          ],
                         ),
                       ),
-                    ],
+                      child: Row(
+                        children: [
+                          const Icon(Icons.favorite,
+                              size: 12, color: Color(0xCCFFFFFF)),
+                          const SizedBox(width: 4),
+                          Text(
+                            _formatCount(w.favorites),
+                            style: const TextStyle(
+                              color: Color(0xCCFFFFFF),
+                              fontSize: 11,
+                            ),
+                          ),
+                          const Spacer(),
+                          Text(
+                            w.resolution,
+                            style: const TextStyle(
+                              color: Color(0xCCFFFFFF),
+                              fontSize: 11,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                   ),
-                ),
+                ],
               ),
             ),
           ),
         ),
+      ),
     );
   }
 

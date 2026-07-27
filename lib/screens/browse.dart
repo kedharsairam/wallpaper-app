@@ -14,7 +14,6 @@ import '../widgets/filter_sheet.dart';
 import '../widgets/grid.dart';
 import '../widgets/empty_illustrations.dart';
 import '../widgets/empty_state.dart';
-import '../widgets/settings_sheet.dart';
 import '../widgets/shimmer_grid.dart';
 
 class BrowseScreen extends StatefulWidget {
@@ -30,9 +29,6 @@ class _BrowseScreenState extends State<BrowseScreen> {
   final _scrollController = ScrollController();
   final _searchController = TextEditingController();
   final _searchFocus = FocusNode();
-  Timer? _searchDebounce;
-  Timer? _suggestionDebounce;
-  var _showSearch = false;
 
   List<Wallpaper> _wallpapers = [];
   var _isLoading = false;
@@ -47,6 +43,8 @@ class _BrowseScreenState extends State<BrowseScreen> {
   CancelToken? _loadMoreToken;
 
   var _rateLimitDismissed = false;
+  var _isHome = true;
+  final _scaffoldKey = GlobalKey<ScaffoldState>();
 
   String _categories = '111';
   String _sorting = 'toplist';
@@ -64,7 +62,7 @@ class _BrowseScreenState extends State<BrowseScreen> {
   @override
   void initState() {
     super.initState();
-    _load();
+    // No initial _load() — homepage is purely static (branding, search, chips).
     _scrollController.addListener(_onScroll);
   }
 
@@ -72,8 +70,6 @@ class _BrowseScreenState extends State<BrowseScreen> {
   void dispose() {
     _cancelToken?.cancel();
     _loadMoreToken?.cancel();
-    _searchDebounce?.cancel();
-    _suggestionDebounce?.cancel();
     _scrollController.removeListener(_onScroll);
     _scrollController.dispose();
     _searchController.dispose();
@@ -90,7 +86,7 @@ class _BrowseScreenState extends State<BrowseScreen> {
   }
 
   Future<void> _load() async {
-    if (_isLoading) return;
+    if (_isLoading || _isHome) return;
     _cancelPreviousRequest();
     setState(() {
       _isLoading = true;
@@ -199,45 +195,26 @@ class _BrowseScreenState extends State<BrowseScreen> {
   void _onSearchSubmitted(String query) async {
     final trimmed = query.trim();
     _query = trimmed.isNotEmpty ? trimmed : null;
+    if (_query == null) return; // empty search — nothing to do
+    setState(() => _isHome = false);
 
     if (_query != null) {
       await RecentSearchesService.save(_query!);
     }
 
     setState(() => _suggestions = []);
-    _searchDebounce?.cancel();
     _load();
   }
 
-  /// Debounced search-as-you-type handler.
+  /// Clears suggestions when the search field is cleared.
   void _onSearchChanged(String value) {
-    _searchDebounce?.cancel();
-    _suggestionDebounce?.cancel();
-    final trimmed = value.trim();
-    if (trimmed.isEmpty) {
+    if (value.trim().isEmpty) {
       setState(() => _suggestions = []);
-      return;
     }
-
-    // Fetch autocomplete suggestions after a short pause.
-    _suggestionDebounce = Timer(const Duration(milliseconds: 200), () {
-      widget.api.suggestions(trimmed).then((results) {
-        if (mounted) setState(() => _suggestions = results);
-      });
-    });
-
-    // Trigger search after debounce.
-    _searchDebounce = Timer(const Duration(milliseconds: 300), () {
-      _query = trimmed;
-      _load();
-    });
   }
 
   void _openSearch() async {
-    setState(() {
-      _showSearch = true;
-      _recentSearches = [];
-    });
+    setState(() => _isHome = false);
     final searches = await RecentSearchesService.load();
     if (mounted) setState(() => _recentSearches = searches);
     WidgetsBinding.instance
@@ -256,7 +233,6 @@ class _BrowseScreenState extends State<BrowseScreen> {
 
   void _closeSearch() {
     setState(() {
-      _showSearch = false;
       _recentSearches = [];
       _suggestions = [];
     });
@@ -268,8 +244,46 @@ class _BrowseScreenState extends State<BrowseScreen> {
     }
   }
 
-  void _openSettings() {
-    SettingsSheet.show(context);
+  /// Returns to the homepage. The browse grid stays alive underneath
+  /// (scroll position preserved). Undo just removes the homepage overlay.
+  void _goHome() {
+    if (_isHome) return;
+    setState(() {
+      _isHome = true;
+      _suggestions = [];
+      _recentSearches = [];
+    });
+    _searchController.clear();
+    _searchFocus.unfocus();
+
+    final scaffoldCtx = _scaffoldKey.currentContext;
+    if (scaffoldCtx != null) {
+      ScaffoldMessenger.of(scaffoldCtx).clearSnackBars();
+      ScaffoldMessenger.of(scaffoldCtx).showSnackBar(
+        SnackBar(
+          content: const Text('Cleared'),
+          duration: const Duration(seconds: 4),
+          action: SnackBarAction(
+            label: 'Undo',
+            onPressed: () {
+              if (mounted) setState(() => _isHome = false);
+            },
+          ),
+        ),
+      );
+    }
+  }
+
+  /// Picks a quick filter from the homepage and switches to browse mode.
+  void _onQuickFilter(String sorting) {
+    setState(() {
+      _isHome = false;
+      _sorting = sorting;
+      _query = null;
+    });
+    _searchController.clear();
+    _searchFocus.unfocus();
+    _load();
   }
 
   void _openFilters() {
@@ -281,16 +295,13 @@ class _BrowseScreenState extends State<BrowseScreen> {
       photoType: _photoType,
       onApply: (categories, sorting, topRange, photoType) {
         setState(() {
+          _isHome = false;
           _categories = categories;
           _sorting = sorting;
           _topRange = topRange;
           _photoType = photoType;
-          // Clear search query when applying filters so they don't overlap.
-          _query = null;
-          _showSearch = false;
+          // Keep _query — search + filters combine on the API side.
         });
-        _searchController.clear();
-        _searchFocus.unfocus();
         _load();
       },
     );
@@ -302,9 +313,7 @@ class _BrowseScreenState extends State<BrowseScreen> {
       bindings: {
         const SingleActivator(LogicalKeyboardKey.keyR): _load,
         const SingleActivator(LogicalKeyboardKey.keyR, control: true): _load,
-        const SingleActivator(LogicalKeyboardKey.escape): () {
-          if (_showSearch) _closeSearch();
-        },
+        const SingleActivator(LogicalKeyboardKey.escape): _closeSearch,
         const SingleActivator(LogicalKeyboardKey.keyF, control: true): _openSearch,
         const SingleActivator(LogicalKeyboardKey.home): _scrollToTop,
         const SingleActivator(LogicalKeyboardKey.arrowUp, control: true):
@@ -313,34 +322,24 @@ class _BrowseScreenState extends State<BrowseScreen> {
       child: Focus(
         autofocus: true,
           child: Scaffold(
+            key: _scaffoldKey,
             backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-            appBar: AppBar(
-              title: _showSearch ? _buildSearchField() : const Text('WallKraft'),
-              centerTitle: true,
-              actions: [
-                if (_showSearch)
-                  TextButton(
-                    onPressed: _closeSearch,
-                    child: const Text('Cancel',
-                        style: TextStyle(color: AppTheme.systemBlue)),
-                  )
-                else
-                  IconButton(
-                    icon: const Icon(Icons.search),
-                    tooltip: 'Search',
-                    onPressed: _openSearch,
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.tune),
-                    tooltip: 'Filters',
-                    onPressed: _openFilters,
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.info_outline),
-                    tooltip: 'About',
-                    onPressed: _openSettings,
-                  ),
-              ],
+            appBar: _isHome ? null : AppBar(
+              title: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 6),
+                child: _buildSearchField(),
+              ),
+              centerTitle: false,
+              titleSpacing: 0,
+              leading: Padding(
+                padding: const EdgeInsets.only(left: 4),
+                child: IconButton(
+                  icon: const Icon(Icons.home_outlined),
+                  tooltip: 'Home',
+                  onPressed: _goHome,
+                ),
+              ),
+              actions: const [SizedBox(width: 8)],
             ),
           body: _body(),
         ),
@@ -350,8 +349,9 @@ class _BrowseScreenState extends State<BrowseScreen> {
 
   Widget _buildSearchField() {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final iconColor = isDark ? AppTheme.secondaryLabel : AppTheme.lightSecondaryLabel;
     return SizedBox(
-      height: 36,
+      height: 40,
       child: TextField(
         key: const ValueKey('search-field'),
         controller: _searchController,
@@ -359,8 +359,7 @@ class _BrowseScreenState extends State<BrowseScreen> {
         cursorColor: AppTheme.systemBlue,
         style: TextStyle(
           color: isDark ? AppTheme.label : AppTheme.lightLabel,
-          fontSize: 16,
-          height: 1.2,
+          fontSize: 15,
         ),
         decoration: InputDecoration(
           hintText: 'Search wallpapers',
@@ -371,17 +370,35 @@ class _BrowseScreenState extends State<BrowseScreen> {
               ? AppTheme.secondarySystemBackground
               : AppTheme.lightSecondaryBackground,
           border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(10),
+            borderRadius: BorderRadius.circular(12),
             borderSide: BorderSide.none,
           ),
-          contentPadding: const EdgeInsets.symmetric(vertical: 0, horizontal: 12),
+          contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 0),
           isDense: true,
-          prefixIconConstraints: const BoxConstraints(minWidth: 36, minHeight: 36),
-          prefixIcon: Padding(
-            padding: const EdgeInsets.only(left: 8, right: 4),
-            child: Icon(Icons.search,
-                color: isDark ? AppTheme.secondaryLabel : AppTheme.lightSecondaryLabel,
-                size: 18),
+          suffixIconConstraints: const BoxConstraints(minWidth: 64, minHeight: 36),
+          suffixIcon: Padding(
+            padding: const EdgeInsets.only(right: 2),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                IconButton(
+                  icon: Icon(Icons.search, color: iconColor, size: 18),
+                  onPressed: () => _onSearchSubmitted(_searchController.text),
+                  splashRadius: 14,
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                  tooltip: 'Search',
+                ),
+                IconButton(
+                  icon: Icon(Icons.tune, color: iconColor, size: 18),
+                  onPressed: _openFilters,
+                  splashRadius: 14,
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                  tooltip: 'Filters',
+                ),
+              ],
+            ),
           ),
         ),
         textInputAction: TextInputAction.search,
@@ -434,64 +451,237 @@ class _BrowseScreenState extends State<BrowseScreen> {
   }
 
   Widget _body() {
-    // Loading state — shimmer placeholder
-    if (_isLoading) {
-      return const ShimmerGrid();
-    }
+    // Determine what to show on top of the persistent grid layer.
+    Widget? overlay;
 
-    final banner = _buildRateLimitBanner();
-    Widget content;
-
-    // Show search suggestions when user is typing
-    if (_showSearch && _query != null && _suggestions.isNotEmpty) {
-      content = _buildSuggestions();
-    } else if (_showSearch && _query == null && _wallpapers.isEmpty && _recentSearches.isNotEmpty) {
-      content = _buildRecentSearches();
+    if (_isHome) {
+      overlay = _buildHomePage();
+    } else if (_isLoading) {
+      overlay = const ShimmerGrid();
+    } else if (_query != null && _suggestions.isNotEmpty) {
+      overlay = _buildSuggestions();
+    } else if (_searchFocus.hasFocus && _query == null &&
+        _recentSearches.isNotEmpty && _wallpapers.isEmpty) {
+      overlay = _buildRecentSearches();
     } else if (_error != null) {
-      content = _buildErrorState();
+      overlay = _buildErrorState();
     } else if (_wallpapers.isEmpty) {
-      content = _buildEmptyState();
-    } else {
-      content = RefreshIndicator(
-        onRefresh: _load,
-        child: WallpaperGrid(
-          wallpapers: _wallpapers,
-          isLoadingMore: _isLoadingMore,
-          hasMore: _hasMore,
-          scrollController: _scrollController,
-          onTap: (wallpaper) async {
-            final result = await Navigator.pushNamed<Map<String, dynamic>>(
-              context,
-              '/detail',
-              arguments: {
-                'api': widget.api,
-                'wallpaper': wallpaper,
-              },
-            );
-            if (!mounted) return;
-            // Handle tag search from detail screen
-            if (result != null && result['searchTag'] is String) {
-              final tag = result['searchTag'] as String;
-              setState(() {
-                _query = tag;
-                _showSearch = true;
-              });
-              _searchController.text = tag;
-              _searchFocus.requestFocus();
-              await RecentSearchesService.save(tag);
-              _load();
-            }
-          },
-        ),
-      );
+      overlay = _buildEmptyState();
     }
+    // else: no overlay — grid shows through
 
-    // Wrap all non-loading states with rate limit banner
+    // Stack layout:
+    //   Layer 0 — Grid (persistent, keeps scroll position alive)
+    //   Layer 1 — Homepage or browse overlay (covers grid when active)
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        if (_wallpapers.isNotEmpty)
+          _buildBrowseGrid(),
+        ?overlay,
+      ],
+    );
+  }
+
+  /// The browse-mode grid with pagination, detail navigation, and rate limit banner.
+  Widget _buildBrowseGrid() {
     return Column(
       children: [
-        banner,
-        Expanded(child: content),
+        _buildRateLimitBanner(),
+        Expanded(
+          child: RefreshIndicator(
+            onRefresh: _load,
+            child: WallpaperGrid(
+              wallpapers: _wallpapers,
+              isLoadingMore: _isLoadingMore,
+              hasMore: _hasMore,
+              scrollController: _scrollController,
+              onTap: (wallpaper) async {
+                final result = await Navigator.pushNamed<Map<String, dynamic>>(
+                  context,
+                  '/detail',
+                  arguments: {
+                    'api': widget.api,
+                    'wallpaper': wallpaper,
+                  },
+                );
+                if (!mounted) return;
+                // Handle tag search from detail screen
+                if (result != null && result['searchTag'] is String) {
+                  final tag = result['searchTag'] as String;
+                  setState(() {
+                    _query = tag;
+                  });
+                  _searchController.text = tag;
+                  _searchFocus.requestFocus();
+                  await RecentSearchesService.save(tag);
+                  _load();
+                }
+              },
+            ),
+          ),
+        ),
       ],
+    );
+  }
+
+  /// Homepage layout: search bar at exact center, branding above, chips below.
+  Widget _buildHomePage() {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final hintColor = isDark ? AppTheme.tertiaryLabel : AppTheme.lightTertiaryLabel;
+
+    return ColoredBox(
+      color: theme.scaffoldBackgroundColor,
+      child: Column(
+        children: [
+          // ── Upper half: branding pushed toward center ──────────────
+          Expanded(
+            flex: 1,
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              Padding(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: AppTheme.spacing16),
+                child: Column(
+                  children: [
+                    Text(
+                      'WallKraft',
+                      style: theme.textTheme.headlineLarge?.copyWith(
+                        fontWeight: FontWeight.bold,
+                        color: theme.colorScheme.onSurface,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Browse Wallpapers',
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: hintColor,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: AppTheme.spacing24),
+            ],
+          ),
+        ),
+
+        // ── Search bar — exact vertical + horizontal center ─────────
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: AppTheme.spacing16),
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 420),
+              child: SizedBox(
+                height: 40,
+                child: TextField(
+                  controller: _searchController,
+                  focusNode: _searchFocus,
+                  cursorColor: AppTheme.systemBlue,
+                  style: TextStyle(
+                    color: isDark ? AppTheme.label : AppTheme.lightLabel,
+                    fontSize: 15,
+                  ),
+                  decoration: InputDecoration(
+                    hintText: 'Search wallpapers',
+                    hintStyle: TextStyle(color: hintColor),
+                    filled: true,
+                    fillColor: isDark
+                        ? AppTheme.secondarySystemBackground
+                        : AppTheme.lightSecondaryBackground,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide.none,
+                    ),
+                    contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 14, vertical: 0),
+                    isDense: true,
+                    suffixIcon: Padding(
+                      padding: const EdgeInsets.only(right: 2),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          IconButton(
+                            icon: Icon(Icons.search, color: hintColor, size: 18),
+                            onPressed: () =>
+                                _onSearchSubmitted(_searchController.text),
+                            splashRadius: 14,
+                            padding: EdgeInsets.zero,
+                            constraints:
+                                const BoxConstraints(minWidth: 32, minHeight: 32),
+                            tooltip: 'Search',
+                          ),
+                          IconButton(
+                            icon: Icon(Icons.tune, color: hintColor, size: 18),
+                            onPressed: _openFilters,
+                            splashRadius: 14,
+                            padding: EdgeInsets.zero,
+                            constraints:
+                                const BoxConstraints(minWidth: 32, minHeight: 32),
+                            tooltip: 'Filters',
+                          ),
+                        ],
+                      ),
+                    ),
+                    suffixIconConstraints:
+                        const BoxConstraints(minWidth: 64, minHeight: 36),
+                  ),
+                  textInputAction: TextInputAction.search,
+                  onSubmitted: _onSearchSubmitted,
+                ),
+              ),
+            ),
+          ),
+        ),
+
+        // ── Lower half: chips pushed toward center ────────────────
+        Expanded(
+          flex: 1,
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.start,
+            children: [
+              const SizedBox(height: AppTheme.spacing16),
+              Padding(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: AppTheme.spacing16),
+                child: Wrap(
+                  alignment: WrapAlignment.center,
+                  spacing: AppTheme.spacing8,
+                  runSpacing: AppTheme.spacing8,
+                  children: [
+                    _quickFilterChip(Icons.schedule, 'Latest', 'date_added'),
+                    _quickFilterChip(Icons.trending_up, 'Top', 'toplist'),
+                    _quickFilterChip(
+                        Icons.local_fire_department, 'Hot', 'hot'),
+                    _quickFilterChip(Icons.shuffle, 'Random', 'random'),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+        ],
+      ),
+    );
+  }
+
+  Widget _quickFilterChip(IconData icon, String label, String sorting) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return ActionChip(
+      avatar: Icon(icon, size: 16,
+          color: isDark ? AppTheme.secondaryLabel : AppTheme.lightSecondaryLabel),
+      label: Text(label, style: const TextStyle(fontSize: 13)),
+      onPressed: () => _onQuickFilter(sorting),
+      backgroundColor: isDark
+          ? AppTheme.secondarySystemBackground
+          : AppTheme.lightSecondaryBackground,
+      side: BorderSide(
+        color: isDark ? AppTheme.separator : AppTheme.lightSeparator,
+        width: 0.5,
+      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
     );
   }
 
@@ -634,7 +824,6 @@ class _BrowseScreenState extends State<BrowseScreen> {
   void _executeRecentSearch(String query) {
     _query = query;
     _searchController.text = query;
-    _showSearch = true;
     _searchFocus.requestFocus();
     _load();
   }
@@ -669,3 +858,5 @@ class _BrowseScreenState extends State<BrowseScreen> {
     );
   }
 }
+
+

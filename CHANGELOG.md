@@ -1,5 +1,31 @@
 # Changelog
 
+## [1.1.6] — 2026-07-27
+
+### Added
+- **Bottom navigation bar**: 4 tabs — Browse, Favorites, Downloads, Settings. Preserves state via `IndexedStack` (scroll position kept alive across tab switches).
+- **Settings screen**: Full-page settings replacing the old bottom sheet. API key management, appearance (theme picker), links (Wallhaven, Source Code, About), app version info.
+- **Quick test script**: `tools/run.ps1` — single command to build + launch Windows debug build.
+- **Pre-commit check script**: `tools/test_all.ps1` — analyze → test → clean → release APK build.
+- **Architecture docs**: `docs/architecture.md` — project structure, data flow, key decisions, platform notes.
+
+### Changed
+- **Homepage redesigned**: No app bar (edge-to-edge). Branding + search bar + quick filter chips. Home button uses Stack overlay (grid stays alive underneath, scroll position preserved). Undo via SnackBar.
+- **App bar (browse mode)**: Home icon on left, compact search bar filling the rest. No action icons (search/filter are embedded in the search bar suffix). `centerTitle: false` + `titleSpacing: 0` for clean alignment.
+- **Search bar**: Unified compact style across homepage and browse app bar — height 40, font 15, border radius 12, content padding 14. Both have search + filter buttons in the suffix.
+- **Filter sheet**: Redesigned with Apple design patterns — sentence-case headers, checkmark selection lists, segmented control for photo type, pill toggle buttons for categories. "Apply" as filled blue bottom button. No staggered entrance animations, no uppercase headers, no radio circles.
+- **Bottom nav**: Now 4 items (Browse, Favorites, Downloads, Settings). Managed by `_MainScaffold` in `app.dart`.
+- **Grid simplification**: `_MasonryTile` converted from `StatefulWidget` to `StatelessWidget` — plain `GestureDetector` with `HitTestBehavior.translucent` for reliable tap handling.
+- **TopRange trimming**: Removed "Past 24h", "Past 3 days", "Past 3 months" options. Remaining: Past week, Past month, Past 6 months, Past year.
+- **Settings sheet removed**: `lib/widgets/settings_sheet.dart` deleted. Replaced by full-page `lib/screens/settings_screen.dart`.
+
+### Fixed
+- **Route type safety**: `MaterialPageRoute<dynamic>` → `MaterialPageRoute<Map<String, dynamic>>` in `app.dart`.
+- **Loading flash**: No `_load()` in `initState` — `_body()` short-circuits to homepage before shimmer.
+- **Duplicate magnifying glass**: Removed decorative `prefixIcon` from homepage search bar (only functional suffix icons remain).
+- **App bar highlight on homepage**: App bar is `null` when `_isHome` is true.
+- **`_showSearch` state removed**: Search bar is always visible in browse app bar. No toggle modes. Keyboard shortcuts simplified.
+
 ## [1.1.5] — 2026-07-27
 
 ### Fixed
