@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart';
 import 'package:mocktail/mocktail.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:wallkraft/api/exception.dart';
 import 'package:wallkraft/screens/browse.dart';
 import 'package:wallkraft/widgets/shimmer_grid.dart';
@@ -30,6 +31,14 @@ void _mockPathProvider() {
   });
 }
 
+/// Helper to enter browse mode by tapping a quick filter chip on the homepage.
+/// Caller must have stubbed api.search() first.
+Future<void> enterBrowseMode(WidgetTester tester) async {
+  await tester.tap(find.text('Latest'));
+  await tester.pump();
+  await tester.pump(const Duration(milliseconds: 100));
+}
+
 void main() {
   late MockWallpaperApi api;
 
@@ -37,6 +46,7 @@ void main() {
     api = MockWallpaperApi();
     api.mockSuggestions([]);
     _mockPathProvider();
+    SharedPreferences.setMockInitialValues({});
   });
 
   tearDown(() {
@@ -54,12 +64,23 @@ void main() {
   }
 
   group('BrowseScreen', () {
-    testWidgets('shows shimmer grid while fetching wallpapers',
+    testWidgets('starts on homepage, transitions to browse mode on filter tap',
         (tester) async {
       await tester.pumpWidget(buildApp());
+      await tester.pump();
 
-      // Should show the shimmer placeholder grid.
-      expect(find.byType(ShimmerGrid), findsOneWidget);
+      // Should start on the homepage with branding visible.
+      expect(find.text('WallKraft'), findsOneWidget);
+      expect(find.byType(ShimmerGrid), findsNothing);
+
+      // Stub search and tap a quick filter to enter browse mode.
+      api.mockSearch(TestData.response(total: 10));
+      await enterBrowseMode(tester);
+
+      // Homepage is gone, grid is visible.
+      expect(find.text('WallKraft'), findsNothing);
+      expect(find.byType(ShimmerGrid), findsNothing);
+      expect(find.byType(MasonryGridView), findsOneWidget);
     });
 
     testWidgets('renders wallpaper grid after successful load',
@@ -68,30 +89,32 @@ void main() {
       api.mockSearch(response);
 
       await tester.pumpWidget(buildApp());
-      // ShimmerGrid has a repeating animation, use pump() not pumpAndSettle.
-      await tester.pump(const Duration(seconds: 1));
+      await tester.pump();
 
-      // Grid should now be visible, shimmer gone.
+      // Enter browse mode via quick filter chip.
+      await enterBrowseMode(tester);
+
+      // Grid should now be visible.
       expect(find.byType(ShimmerGrid), findsNothing);
-      // MasonryGridView from flutter_staggered_grid_view should be present.
       expect(find.byType(MasonryGridView), findsOneWidget);
     });
 
-    testWidgets('calls search API and handles error', (tester) async {
-      // Verify that the widget's _load() method calls api.search().
-      // UI verification of the error state is tricky because the shimmer
-      // animation prevents pumpAndSettle from completing.
+    testWidgets('calls search API when entering browse mode',
+        (tester) async {
+      // Stub search to throw so we can verify the call without loading.
       api.mockSearchError(
         const WallpaperApiException('API error: 500'),
       );
 
       await tester.pumpWidget(buildApp());
+      await tester.pump();
 
-      // Let the microtask queue drain so _load() can process the error.
+      // Enter browse mode — this triggers _load() via _onQuickFilter.
+      await enterBrowseMode(tester);
       await tester.runAsync(() => Future.delayed(const Duration(milliseconds: 50)));
       await tester.pump();
 
-      // The mock was called exactly once (from _load in initState).
+      // The mock was called exactly once (from _load).
       verify(() => api.search(
             query: any(named: 'query'),
             page: any(named: 'page'),
@@ -111,18 +134,21 @@ void main() {
       api.mockSearch(response);
 
       await tester.pumpWidget(buildApp());
-      await tester.pump(const Duration(seconds: 1)); // Load initial page.
+      await tester.pump();
 
-      // Tap the search icon to show search field.
-      await tester.tap(find.byIcon(Icons.search));
-      await tester.pump(const Duration(milliseconds: 300));
+      // Enter browse mode (first API call).
+      await enterBrowseMode(tester);
 
-      // Enter a search query.
-      await tester.enterText(find.byType(TextField), 'cyberpunk');
+      // Find the search TextField in the app bar.
+      final searchField = find.byType(TextField);
+      expect(searchField, findsOneWidget);
+
+      // Enter a search query and submit.
+      await tester.enterText(searchField, 'cyberpunk');
       await tester.testTextInput.receiveAction(TextInputAction.search);
       await tester.pump(const Duration(seconds: 1));
 
-      // Verify that the API was called with our query.
+      // API called twice: initial load + search.
       verify(() => api.search(
             query: any(named: 'query'),
             page: any(named: 'page'),
@@ -133,7 +159,7 @@ void main() {
             order: any(named: 'order'),
             topRange: any(named: 'topRange'),
             ratios: any(named: 'ratios'),
-          )).called(2); // Initial load + search
+          )).called(2);
     });
   });
 }
