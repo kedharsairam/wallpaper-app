@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.1.2] — 2026-07-27
+
+### Fixed
+- **Update checker still showing false positive**: Cached result was returned without re-comparing against current app version. Now cache is invalidated when app version changes, and re-validated on every read.
+- **About section version**: Was hardcoded to `1.0.0` in settings sheet. Now reads dynamically from `package_info_plus`.
+- **Tap not opening images**: `GestureDetector` had `HitTestBehavior.deferToChild` (default) causing taps to slip through to the scroll view. Added `behavior: HitTestBehavior.opaque` and `transformHitTests: false` on the scale animation so the hit area doesn't shrink during press feedback.
+- **Vector illustrations invisible**: Default color `Color(0x4DEBEBF5)` was near-invisible on light backgrounds. Now uses `Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.25)` for proper adaptation.
+- **App icon**: Redesigned from jagged mountain triangles to a clean "W" monogram on dark navy background, generated via `tools/generate_icon.dart`.
+
+### Changed
+- **Filter sheet dropdowns**: Unified into reusable `_buildDropdown<T>()` with cleaner borders, rounded corners, and consistent styling.
+
 ## [1.1.1] — 2026-07-27
 
 ### Fixed

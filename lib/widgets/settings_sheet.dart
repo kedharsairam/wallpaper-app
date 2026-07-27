@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../app.dart';
 import '../services/api_key_service.dart';
@@ -33,11 +34,24 @@ class SettingsSheet extends StatefulWidget {
 
 class _SettingsSheetState extends State<SettingsSheet> {
   String? _apiKey;
+  String _appVersion = '';
 
   @override
   void initState() {
     super.initState();
     _apiKey = widget.initialApiKey;
+    _loadVersion();
+  }
+
+  Future<void> _loadVersion() async {
+    try {
+      final info = await PackageInfo.fromPlatform();
+      if (mounted) {
+        setState(() => _appVersion = '${info.version} (Build ${info.buildNumber})');
+      }
+    } catch (_) {
+      // Fallback — should never happen on a real device.
+    }
   }
 
   Future<void> _openGetKeyUrl() async {
@@ -193,7 +207,7 @@ class _SettingsSheetState extends State<SettingsSheet> {
                   const Text('WallKraft', style: AppTheme.title2),
                   const SizedBox(height: 2),
                   Text(
-                    'Version 1.0.0 (Build 1)',
+                    _appVersion.isEmpty ? 'Version 1.1.1' : 'Version $_appVersion',
                     style: TextStyle(
                       fontSize: 14,
                       color: isDark

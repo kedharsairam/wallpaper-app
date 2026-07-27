@@ -18,22 +18,31 @@ class UpdateChecker {
   static const _apiUrl = 'https://api.github.com/repos/$_repo/releases/latest';
   static const _cacheKey = 'update_check_result';
   static const _cacheTimeKey = 'update_check_time';
+  static const _cacheVersionKey = 'update_check_app_version';
   static const _cacheDuration = Duration(hours: 24);
 
-  /// The current app version (from pubspec.yaml).
-  /// Format: "1.0.0"
+  /// The current app version (from package_info_plus).
+  /// Format: "1.1.0"
   final String currentVersion;
 
   UpdateChecker({required this.currentVersion});
 
   /// Checks if a newer release exists on GitHub.
   ///
-  /// Returns the latest version string (e.g., "1.1.0") if newer,
+  /// Returns the latest version string (e.g., "1.1.1") if newer,
   /// or `null` if already up-to-date or the check fails.
   Future<String?> checkForUpdate() async {
-    // Return cached result if fresh enough.
+    // Return cached result only if the app version hasn't changed
+    // AND the cached version is still newer than current.
     final cached = await _getCachedResult();
-    if (cached != null) return cached;
+    if (cached != null) {
+      if (_compareVersions(cached, currentVersion) > 0) {
+        return cached;
+      }
+      // Cached version is stale — clear it so we re-check.
+      await _cacheResult(null);
+      // Fall through to re-check.
+    }
 
     try {
       final response = await http
@@ -76,16 +85,26 @@ class UpdateChecker {
     }
   }
 
+  /// Returns the cached result only if the cache is fresh AND the
+  /// app version at cache time matches [currentVersion]. If the app
+  /// was updated, the cache is invalidated automatically.
   Future<String?> _getCachedResult() async {
     try {
       final prefs = await SharedPreferences.getInstance();
+
+      // Invalidate cache if the app version changed since last check.
+      final cachedAppVersion = prefs.getString(_cacheVersionKey);
+      if (cachedAppVersion != currentVersion) return null;
+
       final cachedTime = prefs.getInt(_cacheTimeKey);
       if (cachedTime == null) return null;
       final age = DateTime.now().millisecondsSinceEpoch - cachedTime;
       if (age > _cacheDuration.inMilliseconds) return null;
+
       final cached = prefs.getString(_cacheKey);
       // Empty string means "checked recently, no update found".
       if (cached == null || cached.isEmpty) return null;
+
       return cached;
     } catch (e) {
       debugPrint('[UpdateChecker] Cache read failed: $e');
@@ -97,6 +116,7 @@ class UpdateChecker {
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString(_cacheKey, result ?? '');
+      await prefs.setString(_cacheVersionKey, currentVersion);
       await prefs.setInt(_cacheTimeKey, DateTime.now().millisecondsSinceEpoch);
     } catch (e) {
       debugPrint('[UpdateChecker] Cache write failed: $e');

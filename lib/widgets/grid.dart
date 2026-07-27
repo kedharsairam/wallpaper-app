@@ -188,87 +188,87 @@ class _MasonryTileState extends State<_MasonryTile>
     final tileWidth = Responsive.gridTileWidth(context);
 
     return GestureDetector(
+      behavior: HitTestBehavior.opaque,
       onTap: widget.onTap,
-      onSecondaryTap: () => _showContextMenu(context),
       onLongPress: () => _showContextMenu(context),
       onTapDown: (_) => _tapController.forward(),
       onTapUp: (_) => _tapController.reverse(),
       onTapCancel: () => _tapController.reverse(),
       child: AnimatedBuilder(
-        animation: _tapAnimation,
-        builder: (context, child) => Transform.scale(
-          scale: _tapAnimation.value,
-          child: child,
-        ),
-        child: Semantics(
-        label: 'Wallpaper ${w.resolution}',
-        child: Hero(
-          tag: 'wallpaper-${w.id}',
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(12),
-            child: AspectRatio(
-              aspectRatio: aspectRatio,
-              child: Stack(
-                fit: StackFit.expand,
-                children: [
-                  CachedNetworkImage(
-                    imageUrl:
-                        w.thumbnailOriginal ?? w.thumbnail,
-                    fit: BoxFit.cover,
-                    memCacheWidth: tileWidth,
-                    placeholder: (_, _) => const _TilePlaceholder(),
-                    errorWidget: (_, _, _) => const _TileError(),
-                  ),
-                  Positioned(
-                    bottom: 0,
-                    left: 0,
-                    right: 0,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: AppTheme.spacing8,
-                        vertical: 6,
+          animation: _tapAnimation,
+          builder: (context, child) => Transform.scale(
+            scale: _tapAnimation.value,
+            transformHitTests: false,
+            child: child,
+          ),
+          child: Semantics(
+            label: 'Wallpaper ${w.resolution}',
+            child: Hero(
+              tag: 'wallpaper-${w.id}',
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: AspectRatio(
+                  aspectRatio: aspectRatio,
+                  child: Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      CachedNetworkImage(
+                        imageUrl: w.thumbnailOriginal ?? w.thumbnail,
+                        fit: BoxFit.cover,
+                        memCacheWidth: tileWidth,
+                        placeholder: (_, _) => const _TilePlaceholder(),
+                        errorWidget: (_, _, _) => const _TileError(),
                       ),
-                      decoration: const BoxDecoration(
-                        gradient: LinearGradient(
-                          begin: Alignment.bottomCenter,
-                          end: Alignment.topCenter,
-                          colors: [
-                            Color(0xCC000000),
-                            Colors.transparent,
-                          ],
+                      Positioned(
+                        bottom: 0,
+                        left: 0,
+                        right: 0,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: AppTheme.spacing8,
+                            vertical: 6,
+                          ),
+                          decoration: const BoxDecoration(
+                            gradient: LinearGradient(
+                              begin: Alignment.bottomCenter,
+                              end: Alignment.topCenter,
+                              colors: [
+                                Color(0xCC000000),
+                                Colors.transparent,
+                              ],
+                            ),
+                          ),
+                          child: Row(
+                            children: [
+                              const Icon(Icons.favorite,
+                                  size: 12, color: Color(0xCCFFFFFF)),
+                              const SizedBox(width: 4),
+                              Text(
+                                _formatCount(w.favorites),
+                                style: const TextStyle(
+                                  color: Color(0xCCFFFFFF),
+                                  fontSize: 11,
+                                ),
+                              ),
+                              const Spacer(),
+                              Text(
+                                w.resolution,
+                                style: const TextStyle(
+                                  color: Color(0xCCFFFFFF),
+                                  fontSize: 11,
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                       ),
-                      child: Row(
-                        children: [
-                          const Icon(Icons.favorite,
-                              size: 12, color: Color(0xCCFFFFFF)),
-                          const SizedBox(width: 4),
-                          Text(
-                            _formatCount(w.favorites),
-                            style: const TextStyle(
-                              color: Color(0xCCFFFFFF),
-                              fontSize: 11,
-                            ),
-                          ),
-                          const Spacer(),
-                          Text(
-                            w.resolution,
-                            style: const TextStyle(
-                              color: Color(0xCCFFFFFF),
-                              fontSize: 11,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
+                    ],
                   ),
-                ],
+                ),
               ),
             ),
           ),
         ),
-      ),
-    ),
     );
   }
 

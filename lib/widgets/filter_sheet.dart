@@ -190,71 +190,24 @@ class _FilterSheetState extends State<FilterSheet> {
           const SizedBox(height: AppTheme.spacing20),
 
           // ── Sort By ─────────────────────────────────────────────
-          Text('Sort by',
-              style: Theme.of(context).textTheme.titleMedium),
-          const SizedBox(height: AppTheme.spacing8),
-          DropdownButtonFormField<SortOption>(
-            initialValue: _sorting,
-            dropdownColor: isDark
-                ? AppTheme.secondarySystemBackground
-                : AppTheme.lightSecondaryBackground,
-            style: TextStyle(
-              color: isDark ? AppTheme.label : AppTheme.lightLabel,
-            ),
-            decoration: InputDecoration(
-              filled: true,
-              fillColor: isDark
-                  ? AppTheme.secondarySystemBackground
-                  : AppTheme.lightSecondaryBackground,
-              border: const OutlineInputBorder(
-                borderRadius: BorderRadius.all(Radius.circular(10)),
-                borderSide: BorderSide.none,
-              ),
-              contentPadding:
-                  const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-            ),
-            items: SortOption.values
-                .map((o) =>
-                    DropdownMenuItem(value: o, child: Text(o.label)))
-                .toList(),
-            onChanged: (v) {
-              if (v != null) setState(() => _sorting = v);
-            },
+          const SizedBox(height: AppTheme.spacing4),
+          _buildDropdown<SortOption>(
+            label: 'Sort by',
+            value: _sorting,
+            items: SortOption.values,
+            itemLabel: (o) => o.label,
+            onChanged: (v) => setState(() => _sorting = v),
           ),
 
           // ── Top Range ───────────────────────────────────────────
           if (_sorting == SortOption.topList) ...[
             const SizedBox(height: AppTheme.spacing12),
-            Text('Top Range',
-                style: Theme.of(context).textTheme.titleMedium),
-            const SizedBox(height: AppTheme.spacing8),
-            DropdownButtonFormField<TopRange>(
-              initialValue: _topRange,
-              dropdownColor: isDark
-                  ? AppTheme.secondarySystemBackground
-                  : AppTheme.lightSecondaryBackground,
-              style: TextStyle(
-                color: isDark ? AppTheme.label : AppTheme.lightLabel,
-              ),
-              decoration: InputDecoration(
-                filled: true,
-                fillColor: isDark
-                    ? AppTheme.secondarySystemBackground
-                    : AppTheme.lightSecondaryBackground,
-                border: const OutlineInputBorder(
-                  borderRadius: BorderRadius.all(Radius.circular(10)),
-                  borderSide: BorderSide.none,
-                ),
-                contentPadding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-              ),
-              items: TopRange.values
-                  .map((r) =>
-                      DropdownMenuItem(value: r, child: Text(r.label)))
-                  .toList(),
-              onChanged: (v) {
-                if (v != null) setState(() => _topRange = v);
-              },
+            _buildDropdown<TopRange>(
+              label: 'Top Range',
+              value: _topRange,
+              items: TopRange.values,
+              itemLabel: (r) => r.label,
+              onChanged: (v) => setState(() => _topRange = v),
             ),
           ],
 
@@ -289,6 +242,71 @@ class _FilterSheetState extends State<FilterSheet> {
           SizedBox(height: MediaQuery.of(context).padding.bottom + 8),
         ],
       ),
+    );
+  }
+
+  /// Builds a styled dropdown with label, consistent with the filter sheet design.
+  Widget _buildDropdown<T>({
+    required String label,
+    required T value,
+    required List<T> items,
+    required String Function(T) itemLabel,
+    required ValueChanged<T> onChanged,
+  }) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final surfaceColor = isDark
+        ? AppTheme.secondarySystemBackground
+        : AppTheme.lightSecondaryBackground;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(left: 4, bottom: 6),
+          child: Text(label,
+              style: Theme.of(context).textTheme.titleMedium),
+        ),
+        DropdownButtonFormField<T>(
+          initialValue: value,
+          dropdownColor: surfaceColor,
+          icon: Icon(Icons.expand_more_rounded,
+              color: isDark ? AppTheme.label : AppTheme.lightLabel),
+          style: TextStyle(
+            color: isDark ? AppTheme.label : AppTheme.lightLabel,
+            fontSize: 15,
+          ),
+          decoration: InputDecoration(
+            filled: true,
+            fillColor: surfaceColor,
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(
+                color: isDark
+                    ? AppTheme.separator
+                    : AppTheme.lightSeparator,
+              ),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(
+                color: isDark
+                    ? AppTheme.separator.withValues(alpha: 0.3)
+                    : AppTheme.lightSeparator.withValues(alpha: 0.3),
+              ),
+            ),
+            contentPadding:
+                const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+          ),
+          items: items
+              .map((item) => DropdownMenuItem(
+                    value: item,
+                    child: Text(itemLabel(item)),
+                  ))
+              .toList(),
+          onChanged: (v) {
+            if (v != null) onChanged(v);
+          },
+        ),
+      ],
     );
   }
 

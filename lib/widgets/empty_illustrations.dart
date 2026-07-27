@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import '../theme.dart';
 
 /// Which empty-state illustration to show.
 enum Illustration {
@@ -12,23 +11,24 @@ enum Illustration {
 /// Custom vector illustration widget for empty states.
 ///
 /// Each [Illustration] type draws a unique, minimal vector graphic
-/// using [CustomPainter]. The illustrations adapt to the current
-/// theme brightness via [color].
+/// using [CustomPainter]. The color is derived from the current
+/// theme for proper light/dark mode visibility.
 class EmptyIllustration extends StatelessWidget {
   final Illustration type;
   final double size;
-  final Color color;
 
   const EmptyIllustration({
     super.key,
     required this.type,
     this.size = 120,
-    this.color = const Color(0x4DEBEBF5),
   });
 
   @override
   Widget build(BuildContext context) {
-    final paintColor = AppTheme.of(context, color, const Color(0x4D3C3C43));
+    final paintColor = Theme.of(context)
+        .colorScheme
+        .onSurface
+        .withValues(alpha: 0.25);
     return SizedBox(
       width: size,
       height: size,
