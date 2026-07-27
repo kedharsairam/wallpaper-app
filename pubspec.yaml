@@ -17,7 +17,7 @@ dependencies:
   path: ^1.9.0
   sqflite: ^2.4.0
   sqflite_common_ffi: ^2.3.0
-  share_plus: ^10.1.4
+  share_plus: 13.3.0
   flutter_staggered_grid_view: ^0.7.0
   url_launcher: ^6.3.2
   shared_preferences: ^2.5.5
@@ -25,7 +25,7 @@ dependencies:
   flutter_localizations:
     sdk: flutter
   intl: ^0.20.2
-  package_info_plus: 9.0.1
+  package_info_plus: 10.2.1
 
 dev_dependencies:
   flutter_test:
@@ -41,33 +41,6 @@ dev_dependencies:
 dependency_overrides:
   # jni 1.0.1 has a build.gradle bug: applies kotlin-android only for AGP < 9,
   # but runs `kotlin { compilerOptions { ... } }` unconditionally, which fails
-  # with AGP 9 (used by the CI build). Pin to 1.0.0 which doesn't use Kotlin.
+  # with AGP 9. Pin to 1.0.0 which doesn't use Kotlin Gradle plugin at all.
   jni: 1.0.0
 
-flutter_launcher_icons:
-  android: true
-  ios: false
-  remove_alpha_ios: false
-  image_path: "assets/icon_source.png"
-  adaptive_icon_background: "assets/icon_background.png"
-  adaptive_icon_foreground: "assets/icon_foreground.png"
-  min_sdk_android: 21
-
-flutter_native_splash:
-  color: "#0F0F0F"
-  branding: null
-  android_12:
-    color: "#0F0F0F"
-  android: true
-  ios: false
-  web: false
-  fullscreen: true
-
-flutter:
-  uses-material-design: true
-  generate: true
-
-  assets:
-    - assets/icon_source.png
-    - assets/icon_background.png
-    - assets/icon_foreground.png

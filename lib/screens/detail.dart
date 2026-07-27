@@ -295,9 +295,11 @@ class _DetailScreenState extends State<DetailScreen>
 
       scaffold.hideCurrentSnackBar();
 
-      await Share.shareXFiles(
-        [XFile(file.path)],
-        text: 'Wallpaper via WallKraft',
+      await SharePlus.instance.share(
+        ShareParams(
+          files: [XFile(file.path)],
+          text: 'Wallpaper via WallKraft',
+        ),
       );
 
       // Clean up temp file after share.

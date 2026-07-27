@@ -147,9 +147,11 @@ class _MasonryTileState extends State<_MasonryTile>
     try {
       // Download the file first, then share it.
       final path = await DownloadManager.instance.download(w);
-      await Share.shareXFiles(
-        [XFile(path)],
-        text: 'Wallpaper via WallKraft',
+      await SharePlus.instance.share(
+        ShareParams(
+          files: [XFile(path)],
+          text: 'Wallpaper via WallKraft',
+        ),
       );
     } catch (e) {
       if (mounted) {
