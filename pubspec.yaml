@@ -2,7 +2,7 @@ name: wallkraft
 description: "WallKraft — Browse, download, and favorite high-resolution wallpapers."
 publish_to: 'none'
 
-version: 1.1.3+1
+version: 1.1.4+1
 
 environment:
   sdk: ^3.12.2
@@ -43,4 +43,32 @@ dependency_overrides:
   # but runs `kotlin { compilerOptions { ... } }` unconditionally, which fails
   # with AGP 9. Pin to 1.0.0 which doesn't use Kotlin Gradle plugin at all.
   jni: 1.0.0
+
+flutter_launcher_icons:
+  android: true
+  ios: false
+  remove_alpha_ios: false
+  image_path: "assets/icon_source.png"
+  adaptive_icon_background: "assets/icon_background.png"
+  adaptive_icon_foreground: "assets/icon_foreground.png"
+  min_sdk_android: 21
+
+flutter_native_splash:
+  color: "#0F0F0F"
+  branding: null
+  android_12:
+    color: "#0F0F0F"
+  android: true
+  ios: false
+  web: false
+  fullscreen: true
+
+flutter:
+  uses-material-design: true
+  generate: true
+
+  assets:
+    - assets/icon_source.png
+    - assets/icon_background.png
+    - assets/icon_foreground.png
 

@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.1.4] — 2026-07-27
+
+### Fixed
+- **Crash-level: `flutter:` section deleted from `pubspec.yaml`**: `uses-material-design: true` was accidentally removed when adding `dependency_overrides`, causing ALL Material icons (search, filter, heart, share, etc.) to be excluded from the APK. All icons now render properly.
+- **Android `versionName` hardcoded to `1.0.0`**: `android/app/build.gradle.kts` used `versionName = "1.0.0"` instead of `flutter.versionName`. This caused `PackageInfo.fromPlatform()` to always return `1.0.0`, making:
+  - **Update checker** always detect a "newer" version and show false notifications
+  - **About section** display the wrong version
+  Fixed by using `flutter.versionCode` / `flutter.versionName` (matching the stock Flutter template).
+
 ## [1.1.3] — 2026-07-27
 
 ### Changed
