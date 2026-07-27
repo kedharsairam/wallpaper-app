@@ -38,6 +38,12 @@ dev_dependencies:
   image: ^4.9.1
   mocktail: ^1.0.5
 
+dependency_overrides:
+  # jni 1.0.1 has a build.gradle bug: applies kotlin-android only for AGP < 9,
+  # but runs `kotlin { compilerOptions { ... } }` unconditionally, which fails
+  # with AGP 9 (used by the CI build). Pin to 1.0.0 which doesn't use Kotlin.
+  jni: 1.0.0
+
 flutter_launcher_icons:
   android: true
   ios: false
