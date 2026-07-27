@@ -4,18 +4,13 @@ Browse, download, and favorite high-resolution wallpapers.
 
 ## Download
 
-Download the latest APK from the [Releases](https://github.com/kedharsairam/wallpaper-app/releases) page.
-
-Choose the right APK for your device:
-- **arm64-v8a** — most modern phones (recommended)
-- **armeabi-v7a** — older 32-bit devices
-- **x86_64** — emulators and Chromebooks
+Download the latest APK from the [Releases](https://github.com/kedharsairam/wallpaper-app/releases) page. It works on any modern Android phone.
 
 ## Build from Source
 
 ```bash
 flutter pub get
-flutter build apk --release --split-per-abi
+flutter build apk --release
 ```
 
 ## Tech Stack

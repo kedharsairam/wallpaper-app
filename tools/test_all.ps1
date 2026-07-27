@@ -48,8 +48,8 @@ Invoke-StepHard -Label 'flutter clean' -Block {
 }
 
 # ── Step 4: Release build ─────────────────────────────────────────
-Invoke-StepHard -Label 'flutter build apk --release --split-per-abi' -Block {
-    $output = flutter build apk --release --split-per-abi 2>&1
+Invoke-StepHard -Label 'flutter build apk --release' -Block {
+    $output = flutter build apk --release 2>&1
     Write-Host $output
     if ($LASTEXITCODE -ne 0) { throw "Build failed." }
 }

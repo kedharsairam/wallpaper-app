@@ -35,27 +35,17 @@ jobs:
       - name: Test
         run: flutter test
 
-      - name: Build APK (signed or unsigned)
-        run: flutter build apk --release --split-per-abi
+      - name: Build APK (unsigned)
+        run: flutter build apk --release
 
-      - name: Rename APKs with version tag
+      - name: Rename APK with version tag
         id: rename
         run: |
-          # Strip "v" prefix from tag: "v1.0.0" → "1.0.0"
           TAG="${{ github.ref_name }}"
           VERSION="${TAG#v}"
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
-          for apk in build/app/outputs/flutter-apk/*.apk; do
-            name=$(basename "$apk")
-            # Extract ABI from filename: app-arm64-v8a-release.apk → arm64-v8a
-            abi=$(echo "$name" | sed -E 's/^app-(.+)-release\.apk$/\1/')
-            if [ "$abi" = "$name" ]; then
-              newname="WallKraft-${VERSION}-universal.apk"
-            else
-              newname="WallKraft-${VERSION}-${abi}.apk"
-            fi
-            mv "$apk" "$(dirname "$apk")/$newname"
-          done
+          mv build/app/outputs/flutter-apk/app-release.apk \
+             build/app/outputs/flutter-apk/WallKraft-${VERSION}.apk
 
       - name: Create Release
         uses: softprops/action-gh-release@v2
@@ -64,16 +54,8 @@ jobs:
           body: |
             ## WallKraft ${{ github.ref_name }}
 
-            Download the APK for your device:
-
-            | Architecture | File |
-            |-------------|------|
-            | **arm64-v8a** (modern phones) | `WallKraft-${{ steps.rename.outputs.version }}-arm64-v8a.apk` |
-            | **armeabi-v7a** (older 32-bit devices) | `WallKraft-${{ steps.rename.outputs.version }}-armeabi-v7a.apk` |
-            | **x86_64** (emulators / Chromebooks) | `WallKraft-${{ steps.rename.outputs.version }}-x86_64.apk` |
-
             ### Install
-            1. Download the APK for your device
+            1. Download `WallKraft-${{ steps.rename.outputs.version }}.apk`
             2. Open the file on your Android device
             3. Allow "Install from unknown sources" if prompted
 
