@@ -189,10 +189,12 @@ class _MasonryTileState extends State<_MasonryTile>
 
     final tileWidth = Responsive.gridTileWidth(context);
 
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
+    return InkWell(
       onTap: widget.onTap,
       onLongPress: () => _showContextMenu(context),
+      borderRadius: BorderRadius.circular(12),
+      splashColor: Theme.of(context).colorScheme.primary.withValues(alpha: 0.15),
+      highlightColor: Colors.transparent,
       onTapDown: (_) => _tapController.forward(),
       onTapUp: (_) => _tapController.reverse(),
       onTapCancel: () => _tapController.reverse(),
