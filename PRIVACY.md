@@ -42,4 +42,4 @@ If this policy changes, the "Last updated" date at the top will be revised.
 ## Contact
 
 For questions about this privacy policy, open an issue at:
-**github.com/kedharsairam/wallpaper-app**
+**github.com/kedharsairam/wallkraft**

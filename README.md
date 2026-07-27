@@ -4,7 +4,7 @@ Browse, download, and favorite high-resolution wallpapers.
 
 ## Download
 
-Download the latest APK from the [Releases](https://github.com/kedharsairam/wallpaper-app/releases) page. It works on any modern Android phone.
+Download the latest APK from the [Releases](https://github.com/kedharsairam/wallkraft/releases) page. It works on any modern Android phone.
 
 ## Build from Source
 

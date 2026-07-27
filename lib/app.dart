@@ -158,7 +158,7 @@ class _MainScaffoldState extends State<_MainScaffold>
               label: 'Update',
               onPressed: () async {
                 final uri = Uri.parse(
-                    'https://github.com/kedharsairam/wallpaper-app/releases/latest');
+                    'https://github.com/kedharsairam/wallkraft/releases/latest');
                 final launched = await launchUrl(
                   uri,
                   mode: LaunchMode.externalApplication,

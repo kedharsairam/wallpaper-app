@@ -6,7 +6,7 @@ import 'dart:convert';
 /// Checks GitHub Releases for newer versions of WallKraft.
 ///
 /// On launch, fetches the latest release tag from
-/// github.com/kedharsairam/wallpaper-app and compares it
+/// github.com/kedharsairam/wallkraft and compares it
 /// against the current version. If a newer version exists,
 /// the caller can show an update prompt.
 ///
@@ -14,7 +14,7 @@ import 'dart:convert';
 /// the result is cached in SharedPreferences and only re-checked
 /// once every 24 hours per session.
 class UpdateChecker {
-  static const _repo = 'kedharsairam/wallpaper-app';
+  static const _repo = 'kedharsairam/wallkraft';
   static const _apiUrl = 'https://api.github.com/repos/$_repo/releases/latest';
   static const _cacheKey = 'update_check_result';
   static const _cacheTimeKey = 'update_check_time';

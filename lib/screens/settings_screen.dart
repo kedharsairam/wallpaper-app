@@ -322,14 +322,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
               Icons.code,
               'Source Code',
               onTap: () =>
-                  _openUrl('https://github.com/kedharsairam/wallpaper-app'),
+                  _openUrl('https://github.com/kedharsairam/wallkraft'),
             ),
             const Divider(height: 1),
             _settingRow(
               Icons.info_outline,
               'About',
               onTap: () => _openUrl(
-                  'https://github.com/kedharsairam/wallpaper-app#readme'),
+                  'https://github.com/kedharsairam/wallkraft#readme'),
             ),
 
             const SizedBox(height: AppTheme.spacing24),
