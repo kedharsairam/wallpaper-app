@@ -11,6 +11,9 @@ dependencies:
   flutter:
     sdk: flutter
 
+  shared:
+    path: ../shared
+
   http: ^1.2.0
   cached_network_image: ^3.4.0
   path_provider: ^2.1.0
