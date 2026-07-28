@@ -10,8 +10,22 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+    defaults:
+      run:
+        working-directory: wallkraft
+
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout wallkraft
+        uses: actions/checkout@v4
+        with:
+          path: wallkraft
+
+      - name: Checkout shared
+        uses: actions/checkout@v4
+        with:
+          repository: kedharsairam/shared
+          path: shared
+          token: ${{ secrets.PAT_SHARED }}
 
       - name: Setup Java
         uses: actions/setup-java@v4
@@ -63,4 +77,4 @@ jobs:
             - Analyze: ✅ passes
             - Tests: ✅ passes
           files: |
-            build/app/outputs/flutter-apk/WallKraft-*.apk
+            wallkraft/build/app/outputs/flutter-apk/WallKraft-*.apk
