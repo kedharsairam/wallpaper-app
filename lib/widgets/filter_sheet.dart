@@ -10,16 +10,14 @@ import '../theme.dart';
 class FilterSheet extends StatefulWidget {
   final String categories;
   final String sorting;
-  final String? topRange;
   final PhotoType photoType;
-  final void Function(String categories, String sorting, String? topRange,
-      PhotoType photoType) onApply;
+  final void Function(String categories, String sorting, PhotoType photoType)
+      onApply;
 
   const FilterSheet({
     super.key,
     required this.categories,
     required this.sorting,
-    this.topRange,
     this.photoType = PhotoType.both,
     required this.onApply,
   });
@@ -29,9 +27,8 @@ class FilterSheet extends StatefulWidget {
     BuildContext context, {
     required String categories,
     required String sorting,
-    String? topRange,
     PhotoType photoType = PhotoType.both,
-    required void Function(String, String, String?, PhotoType) onApply,
+    required void Function(String, String, PhotoType) onApply,
   }) {
     showModalBottomSheet(
       context: context,
@@ -43,7 +40,6 @@ class FilterSheet extends StatefulWidget {
       builder: (_) => FilterSheet(
         categories: categories,
         sorting: sorting,
-        topRange: topRange,
         photoType: photoType,
         onApply: onApply,
       ),
@@ -59,7 +55,6 @@ class _FilterSheetState extends State<FilterSheet> {
   late bool _anime;
   late bool _people;
   late SortOption _sorting;
-  late TopRange _topRange;
   late PhotoType _photoType;
 
   @override
@@ -70,18 +65,13 @@ class _FilterSheetState extends State<FilterSheet> {
     _anime = cats[1] == '1';
     _people = cats[2] == '1';
     _sorting = SortOption.fromApi(widget.sorting);
-    _topRange = TopRange.values.firstWhere(
-      (r) => r.apiValue == (widget.topRange ?? '1M'),
-      orElse: () => TopRange.pastMonth,
-    );
     _photoType = widget.photoType;
   }
 
   void _apply() {
     final cats =
         '${_general ? '1' : '0'}${_anime ? '1' : '0'}${_people ? '1' : '0'}';
-    widget.onApply(cats, _sorting.apiValue,
-        _sorting == SortOption.topList ? _topRange.apiValue : null, _photoType);
+    widget.onApply(cats, _sorting.apiValue, _photoType);
     Navigator.pop(context);
   }
 
@@ -185,20 +175,6 @@ class _FilterSheetState extends State<FilterSheet> {
                     isDark: isDark,
                     separator: separator,
                   ),
-
-                  if (_sorting == SortOption.topList) ...[
-                    const SizedBox(height: 24),
-                    _sectionHeader('Top Range', isDark),
-                    const SizedBox(height: 6),
-                    _buildCheckmarkList(
-                      items: TopRange.values,
-                      selectedItem: _topRange,
-                      onSelected: (v) => setState(() => _topRange = v),
-                      labelBuilder: (v) => v.label,
-                      isDark: isDark,
-                      separator: separator,
-                    ),
-                  ],
 
                   const SizedBox(height: 28),
 

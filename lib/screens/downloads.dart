@@ -18,7 +18,6 @@ class DownloadsScreen extends StatefulWidget {
 
 class DownloadsScreenState extends State<DownloadsScreen> {
   List<_DownloadEntry> _entries = [];
-  var _isLoading = true;
 
   /// Refresh the downloads list from disk.
   void refresh() => _loadDownloads();
@@ -30,7 +29,6 @@ class DownloadsScreenState extends State<DownloadsScreen> {
   }
 
   Future<void> _loadDownloads() async {
-    setState(() => _isLoading = true);
     try {
       final docsDir = await getApplicationDocumentsDirectory();
       final dir = Directory(docsDir.path);
@@ -56,8 +54,6 @@ class DownloadsScreenState extends State<DownloadsScreen> {
     } catch (e) {
       debugPrint('[Downloads] Load failed: $e');
       if (mounted) setState(() => _entries = []);
-    } finally {
-      if (mounted) setState(() => _isLoading = false);
     }
   }
 
@@ -83,19 +79,6 @@ class DownloadsScreenState extends State<DownloadsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    if (_isLoading) {
-      return Center(
-        child: SizedBox(
-          width: 24,
-          height: 24,
-          child: CircularProgressIndicator(
-            color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
-            strokeWidth: 2,
-          ),
-        ),
-      );
-    }
-
     if (_entries.isEmpty) {
       return EmptyState(
         illustration: Illustration.downloads,

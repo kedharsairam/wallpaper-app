@@ -15,7 +15,6 @@ import '../helpers/responsive.dart';
 /// [RepaintBoundary] for scroll performance.
 class WallpaperGrid extends StatelessWidget {
   final List<Wallpaper> wallpapers;
-  final bool isLoadingMore;
   final bool hasMore;
   final ScrollController? scrollController;
   final void Function(Wallpaper) onTap;
@@ -24,7 +23,6 @@ class WallpaperGrid extends StatelessWidget {
   const WallpaperGrid({
     super.key,
     required this.wallpapers,
-    this.isLoadingMore = false,
     this.hasMore = true,
     this.scrollController,
     required this.onTap,
@@ -33,19 +31,14 @@ class WallpaperGrid extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final itemCount = wallpapers.length + (isLoadingMore ? 1 : 0);
-
     return MasonryGridView.extent(
       controller: scrollController,
       padding: const EdgeInsets.all(AppTheme.spacing8),
       maxCrossAxisExtent: 190,
       crossAxisSpacing: AppTheme.spacing8,
       mainAxisSpacing: AppTheme.spacing8,
-      itemCount: itemCount,
+      itemCount: wallpapers.length,
       itemBuilder: (context, index) {
-        if (index >= wallpapers.length) {
-          return const _LoadMoreIndicator();
-        }
         return RepaintBoundary(
           child: _MasonryTile(
             wallpaper: wallpapers[index],
@@ -54,27 +47,6 @@ class WallpaperGrid extends StatelessWidget {
           ),
         );
       },
-    );
-  }
-}
-
-class _LoadMoreIndicator extends StatelessWidget {
-  const _LoadMoreIndicator();
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.all(AppTheme.spacing16),
-      child: Center(
-        child: SizedBox(
-          width: 20,
-          height: 20,
-          child: CircularProgressIndicator(
-            color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
-            strokeWidth: 2,
-          ),
-        ),
-      ),
     );
   }
 }

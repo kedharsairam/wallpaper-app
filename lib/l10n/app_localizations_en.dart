@@ -153,13 +153,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get filtersSorting => 'Sorting';
 
   @override
-  String get filtersToplist => 'Toplist';
-
-  @override
   String get filtersDateAdded => 'Date Added';
-
-  @override
-  String get filtersRelevance => 'Relevance';
 
   @override
   String get filtersRandom => 'Random';

@@ -39,7 +39,7 @@ class WallpaperApi {
     String? query,
     String categories = '111',
     String purity = '100',
-    String sorting = 'toplist',
+    String sorting = 'date_added',
     String order = 'desc',
     String? topRange,
     String? ratios,

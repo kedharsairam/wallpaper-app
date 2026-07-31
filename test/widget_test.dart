@@ -23,13 +23,10 @@ void main() {
   });
 
   test('SortOption enum parses API strings correctly', () {
-    expect(SortOption.fromApi('date_added'), SortOption.dateAdded);
-    expect(SortOption.fromApi('relevance'), SortOption.relevance);
+    expect(SortOption.fromApi('date_added'), SortOption.latest);
     expect(SortOption.fromApi('random'), SortOption.random);
-    expect(SortOption.fromApi('views'), SortOption.mostViewed);
     expect(SortOption.fromApi('favorites'), SortOption.mostFavorited);
-    expect(SortOption.fromApi('toplist'), SortOption.topList);
-    expect(SortOption.fromApi('invalid'), SortOption.dateAdded);
+    expect(SortOption.fromApi('invalid'), SortOption.latest);
   });
 
   test('WallpaperResponse fromJson handles empty data gracefully', () {

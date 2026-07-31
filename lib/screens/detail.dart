@@ -21,7 +21,6 @@ class DetailScreen extends StatefulWidget {
 class _DetailScreenState extends State<DetailScreen>
     with SingleTickerProviderStateMixin {
   Wallpaper? _wallpaper;
-  var _isLoading = true;
   String? _error;
   var _chromeVisible = true;
   var _isFavorite = false;
@@ -55,11 +54,9 @@ class _DetailScreenState extends State<DetailScreen>
       if (args != null) {
         _wallpaper = args['wallpaper'] as Wallpaper?;
         if (_wallpaper != null) {
-          _isLoading = false;
           _checkFavorite();
         } else {
           _error = 'Wallpaper not found';
-          _isLoading = false;
         }
       }
     }
@@ -262,25 +259,7 @@ class _DetailScreenState extends State<DetailScreen>
   Future<void> _share() async {
     if (_wallpaper == null) return;
 
-    // Show a loading dialog while preparing the image.
     if (!mounted) return;
-    final scaffold = ScaffoldMessenger.of(context);
-    scaffold.showSnackBar(
-      const SnackBar(
-        content: Row(
-          children: [
-            SizedBox(
-              width: 18,
-              height: 18,
-              child: CircularProgressIndicator(strokeWidth: 2),
-            ),
-            SizedBox(width: 12),
-            Text('Preparing image…'),
-          ],
-        ),
-        duration: Duration(seconds: 30),
-      ),
-    );
 
     try {
       // Download to a temp file — do not add to download history.
@@ -292,8 +271,6 @@ class _DetailScreenState extends State<DetailScreen>
         throw HttpException('HTTP ${response.statusCode}');
       }
       await file.writeAsBytes(response.bodyBytes);
-
-      scaffold.hideCurrentSnackBar();
 
       await SharePlus.instance.share(
         ShareParams(
@@ -307,9 +284,8 @@ class _DetailScreenState extends State<DetailScreen>
         await file.delete();
       }
     } catch (e) {
-      scaffold.hideCurrentSnackBar();
       if (mounted) {
-        scaffold.showSnackBar(
+        ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Share failed: $e')),
         );
       }
@@ -474,19 +450,6 @@ class _DetailScreenState extends State<DetailScreen>
   }
 
   Widget _buildBody() {
-    if (_isLoading) {
-      return const Center(
-        child: SizedBox(
-          width: 24,
-          height: 24,
-          child: CircularProgressIndicator(
-            color: AppTheme.secondaryLabel,
-            strokeWidth: 2,
-          ),
-        ),
-      );
-    }
-
     if (_error != null || _wallpaper == null) {
       return Center(
         child: Column(
@@ -532,16 +495,7 @@ class _DetailScreenState extends State<DetailScreen>
                               key: ValueKey('img-$_imageLoadAttempt'),
                               imageUrl: _wallpaper!.path,
                               fit: BoxFit.contain,
-                              placeholder: (_, _) => const Center(
-                                child: SizedBox(
-                                  width: 24,
-                                  height: 24,
-                                  child: CircularProgressIndicator(
-                                    color: AppTheme.secondaryLabel,
-                                    strokeWidth: 2,
-                                  ),
-                                ),
-                              ),
+                              placeholder: (_, _) => const SizedBox.shrink(),
                               errorWidget: (_, _, _) {
                                 WidgetsBinding.instance
                                     .addPostFrameCallback((_) {

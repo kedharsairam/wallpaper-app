@@ -24,12 +24,10 @@ enum Category {
 
 /// Sort options for wallpaper search.
 enum SortOption {
-  dateAdded('Date Added', 'date_added'),
-  relevance('Relevance', 'relevance'),
+  hot('Hot', 'hot'),
+  latest('Latest', 'date_added'),
   random('Random', 'random'),
-  mostViewed('Most Viewed', 'views'),
-  mostFavorited('Most Favorited', 'favorites'),
-  topList('Top List', 'toplist');
+  mostFavorited('Most Favorited', 'favorites');
 
   final String label;
   final String apiValue;
@@ -38,7 +36,7 @@ enum SortOption {
   static SortOption fromApi(String value) {
     return SortOption.values.firstWhere(
       (o) => o.apiValue == value,
-      orElse: () => SortOption.dateAdded,
+      orElse: () => SortOption.latest,
     );
   }
 }
@@ -56,14 +54,4 @@ enum PhotoType {
   const PhotoType(this.label, this.apiValue);
 }
 
-/// Top range filter for ranking-based sorting.
-enum TopRange {
-  pastWeek('Past week', '1w'),
-  pastMonth('Past month', '1M'),
-  past6Months('Past 6 months', '6M'),
-  pastYear('Past year', '1y');
 
-  final String label;
-  final String apiValue;
-  const TopRange(this.label, this.apiValue);
-}

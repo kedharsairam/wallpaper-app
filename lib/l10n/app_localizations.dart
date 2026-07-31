@@ -357,23 +357,11 @@ abstract class AppLocalizations {
   /// **'Sorting'**
   String get filtersSorting;
 
-  /// Sort option: toplist
-  ///
-  /// In en, this message translates to:
-  /// **'Toplist'**
-  String get filtersToplist;
-
   /// Sort option: date added
   ///
   /// In en, this message translates to:
   /// **'Date Added'**
   String get filtersDateAdded;
-
-  /// Sort option: relevance
-  ///
-  /// In en, this message translates to:
-  /// **'Relevance'**
-  String get filtersRelevance;
 
   /// Sort option: random
   ///

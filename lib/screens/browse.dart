@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import '../api/cancel_token.dart';
 import '../api/client.dart';
 import '../api/exception.dart';
@@ -14,7 +15,6 @@ import '../widgets/filter_sheet.dart';
 import '../widgets/grid.dart';
 import '../widgets/empty_illustrations.dart';
 import '../widgets/empty_state.dart';
-import '../widgets/shimmer_grid.dart';
 
 class BrowseScreen extends StatefulWidget {
   final WallpaperApi api;
@@ -44,11 +44,9 @@ class _BrowseScreenState extends State<BrowseScreen> {
 
   var _rateLimitDismissed = false;
   var _isHome = true;
-  final _scaffoldKey = GlobalKey<ScaffoldState>();
 
   String _categories = '111';
-  String _sorting = 'toplist';
-  String? _topRange;
+  String _sorting = 'date_added';
   String? _query;
   PhotoType _photoType = PhotoType.both;
 
@@ -62,8 +60,42 @@ class _BrowseScreenState extends State<BrowseScreen> {
   @override
   void initState() {
     super.initState();
-    // No initial _load() — homepage is purely static (branding, search, chips).
     _scrollController.addListener(_onScroll);
+    // Populate grid behind the homepage overlay from cache so the first
+    // tap transitions instantly instead of showing a blank frame.
+    _warmCache();
+  }
+
+  /// Loads the last successful search results from cache and populates the
+  /// grid behind the homepage overlay. The homepage stays visible until the
+  /// user interacts; when they do, the grid is already there.
+  Future<void> _warmCache() async {
+    try {
+      final cached = await CacheService.instance.load();
+      if (cached == null || !mounted) return;
+      final rawData = cached['data'];
+      if (rawData is! List) return;
+      final restored = rawData
+          .whereType<Map<String, dynamic>>()
+          .map(Wallpaper.fromJson)
+          .toList();
+      if (restored.isEmpty) return;
+      setState(() {
+        _wallpapers = restored;
+        _hasMore = false;
+      });
+      for (final w in restored) {
+        final thumbUrl = w.thumbnailOriginal ?? w.thumbnail;
+        if (thumbUrl.isNotEmpty) {
+          unawaited(precacheImage(
+            CachedNetworkImageProvider(thumbUrl),
+            context,
+          ));
+        }
+      }
+    } catch (e) {
+      debugPrint('[Browse] Cache warm failed: $e');
+    }
   }
 
   @override
@@ -86,7 +118,7 @@ class _BrowseScreenState extends State<BrowseScreen> {
   }
 
   Future<void> _load() async {
-    if (_isLoading || _isHome) return;
+    if (_isLoading) return;
     _cancelPreviousRequest();
     setState(() {
       _isLoading = true;
@@ -99,7 +131,6 @@ class _BrowseScreenState extends State<BrowseScreen> {
         query: _query,
         categories: _categories,
         sorting: _sorting,
-        topRange: _topRange,
         ratios: _photoType.apiValue,
         page: 1,
         cancelToken: _cancelToken,
@@ -109,7 +140,19 @@ class _BrowseScreenState extends State<BrowseScreen> {
         _wallpapers = response.data;
         _hasMore = _page < response.meta.lastPage;
         _isLoading = false;
+        _isHome = false; // transition from homepage when data is ready
       });
+      // Pre-cache thumbnails so the grid shows images instantly.
+      for (final w in response.data) {
+        final thumbUrl = w.thumbnailOriginal ?? w.thumbnail;
+        if (thumbUrl.isNotEmpty) {
+          unawaited(precacheImage(
+            CachedNetworkImageProvider(thumbUrl),
+            context,
+          ));
+        }
+      }
+
       // Cache raw JSON for offline fallback
       try {
         final cacheJson = {
@@ -123,25 +166,38 @@ class _BrowseScreenState extends State<BrowseScreen> {
       // Request was intentionally cancelled — ignore.
     } catch (e) {
       if (!mounted) return;
-      // Try loading from cache if we have nothing to show
-      if (_wallpapers.isEmpty) {
-        final cached = await CacheService.instance.load();
-        if (cached != null && mounted) {
-          final rawData = cached['data'];
-          if (rawData is List) {
-            final restored = rawData
-                .whereType<Map<String, dynamic>>()
-                .map(Wallpaper.fromJson)
-                .toList();
-            if (restored.isNotEmpty) {
-              setState(() {
-                _wallpapers = restored;
-                _error = null;
-                _isLoading = false;
-                _hasMore = false;
-              });
-              return;
+      // If we already have data (e.g., from _warmCache), keep it silently.
+      if (_wallpapers.isNotEmpty) {
+        setState(() => _isLoading = false);
+        return;
+      }
+      // Try loading from cache as a last resort.
+      final cached = await CacheService.instance.load();
+      if (cached != null && mounted) {
+        final rawData = cached['data'];
+        if (rawData is List) {
+          final restored = rawData
+              .whereType<Map<String, dynamic>>()
+              .map(Wallpaper.fromJson)
+              .toList();
+          if (restored.isNotEmpty) {
+            setState(() {
+              _wallpapers = restored;
+              _error = null;
+              _isLoading = false;
+              _hasMore = false;
+              _isHome = false;
+            });
+            for (final w in restored) {
+              final thumbUrl = w.thumbnailOriginal ?? w.thumbnail;
+              if (thumbUrl.isNotEmpty) {
+                unawaited(precacheImage(
+                  CachedNetworkImageProvider(thumbUrl),
+                  context,
+                ));
+              }
             }
+            return;
           }
         }
       }
@@ -168,7 +224,6 @@ class _BrowseScreenState extends State<BrowseScreen> {
         query: _query,
         categories: _categories,
         sorting: _sorting,
-        topRange: _topRange,
         ratios: _photoType.apiValue,
         page: next,
         cancelToken: _loadMoreToken,
@@ -245,7 +300,7 @@ class _BrowseScreenState extends State<BrowseScreen> {
   }
 
   /// Returns to the homepage. The browse grid stays alive underneath
-  /// (scroll position preserved). Undo just removes the homepage overlay.
+  /// (scroll position preserved).
   void _goHome() {
     if (_isHome) return;
     setState(() {
@@ -255,29 +310,12 @@ class _BrowseScreenState extends State<BrowseScreen> {
     });
     _searchController.clear();
     _searchFocus.unfocus();
-
-    final scaffoldCtx = _scaffoldKey.currentContext;
-    if (scaffoldCtx != null) {
-      ScaffoldMessenger.of(scaffoldCtx).clearSnackBars();
-      ScaffoldMessenger.of(scaffoldCtx).showSnackBar(
-        SnackBar(
-          content: const Text('Cleared'),
-          duration: const Duration(seconds: 4),
-          action: SnackBarAction(
-            label: 'Undo',
-            onPressed: () {
-              if (mounted) setState(() => _isHome = false);
-            },
-          ),
-        ),
-      );
-    }
   }
 
-  /// Picks a quick filter from the homepage and switches to browse mode.
+  /// Picks a quick filter from the homepage and switches to browse mode
+  /// only when data is ready — no loading flash, no blank state.
   void _onQuickFilter(String sorting) {
     setState(() {
-      _isHome = false;
       _sorting = sorting;
       _query = null;
     });
@@ -291,16 +329,13 @@ class _BrowseScreenState extends State<BrowseScreen> {
       context,
       categories: _categories,
       sorting: _sorting,
-      topRange: _topRange,
       photoType: _photoType,
-      onApply: (categories, sorting, topRange, photoType) {
+      onApply: (categories, sorting, photoType) {
         setState(() {
           _isHome = false;
           _categories = categories;
           _sorting = sorting;
-          _topRange = topRange;
           _photoType = photoType;
-          // Keep _query — search + filters combine on the API side.
         });
         _load();
       },
@@ -322,7 +357,6 @@ class _BrowseScreenState extends State<BrowseScreen> {
       child: Focus(
         autofocus: true,
           child: Scaffold(
-            key: _scaffoldKey,
             backgroundColor: Theme.of(context).scaffoldBackgroundColor,
             appBar: _isHome ? null : AppBar(
               title: Padding(
@@ -457,7 +491,7 @@ class _BrowseScreenState extends State<BrowseScreen> {
     if (_isHome) {
       overlay = _buildHomePage();
     } else if (_isLoading) {
-      overlay = const ShimmerGrid();
+      // Keep the grid visible — no loading spinner, no empty state flash.
     } else if (_query != null && _suggestions.isNotEmpty) {
       overlay = _buildSuggestions();
     } else if (_searchFocus.hasFocus && _query == null &&
@@ -476,8 +510,9 @@ class _BrowseScreenState extends State<BrowseScreen> {
     return Stack(
       fit: StackFit.expand,
       children: [
-        if (_wallpapers.isNotEmpty)
-          _buildBrowseGrid(),
+        // Always render the grid frame to avoid blank flash during loading.
+        // When wallpapers is empty, the child widget just shows nothing.
+        _buildBrowseGrid(),
         ?overlay,
       ],
     );
@@ -493,7 +528,6 @@ class _BrowseScreenState extends State<BrowseScreen> {
             onRefresh: _load,
             child: WallpaperGrid(
               wallpapers: _wallpapers,
-              isLoadingMore: _isLoadingMore,
               hasMore: _hasMore,
               scrollController: _scrollController,
               onTap: (wallpaper) async {
@@ -646,16 +680,15 @@ class _BrowseScreenState extends State<BrowseScreen> {
               Padding(
                 padding:
                     const EdgeInsets.symmetric(horizontal: AppTheme.spacing16),
-                child: Wrap(
-                  alignment: WrapAlignment.center,
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
                   spacing: AppTheme.spacing8,
-                  runSpacing: AppTheme.spacing8,
                   children: [
-                    _quickFilterChip(Icons.schedule, 'Latest', 'date_added'),
-                    _quickFilterChip(Icons.trending_up, 'Top', 'toplist'),
                     _quickFilterChip(
                         Icons.local_fire_department, 'Hot', 'hot'),
-                    _quickFilterChip(Icons.shuffle, 'Random', 'random'),
+                    _quickFilterChip(Icons.schedule, 'Latest', 'date_added'),
+                    _quickFilterChip(
+                        Icons.favorite_outlined, 'Most Favorited', 'favorites'),
                   ],
                 ),
               ),

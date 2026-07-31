@@ -17,7 +17,6 @@ class FavoritesScreen extends StatefulWidget {
 
 class FavoritesScreenState extends State<FavoritesScreen> {
   List<Wallpaper> _favorites = [];
-  var _isLoading = true;
 
   @override
   void initState() {
@@ -29,15 +28,12 @@ class FavoritesScreenState extends State<FavoritesScreen> {
   void refresh() => _loadFavorites();
 
   Future<void> _loadFavorites() async {
-    setState(() => _isLoading = true);
     try {
       final faves = await WallKraftDatabase.getFavorites();
       if (mounted) setState(() => _favorites = faves);
     } catch (e) {
       debugPrint('[Favorites] Load failed: $e');
       if (mounted) setState(() => _favorites = []);
-    } finally {
-      if (mounted) setState(() => _isLoading = false);
     }
   }
 
@@ -51,19 +47,6 @@ class FavoritesScreenState extends State<FavoritesScreen> {
 
   @override
   Widget build(BuildContext context) {
-    if (_isLoading) {
-      return Center(
-        child: SizedBox(
-          width: 24,
-          height: 24,
-          child: CircularProgressIndicator(
-            color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
-            strokeWidth: 2,
-          ),
-        ),
-      );
-    }
-
     if (_favorites.isEmpty) {
       return EmptyState(
         illustration: Illustration.favorites,
